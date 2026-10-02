@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import io
 import unittest
+from unittest import mock
 
 from jevperf.cli import build_cli
 from tests.fakes import FakeContext
@@ -66,6 +67,22 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Hermes Jev Performance", output)
 
+    def test_benchmark_preview_never_runs_live_harness(self):
+        with mock.patch(
+            "jevperf.cli.run_live_benchmark",
+            side_effect=AssertionError("live benchmark must not run"),
+        ):
+            code, output, _, _ = self.parse_and_run([
+                "benchmark",
+                "--repeats",
+                "2",
+                "--warmups",
+                "0",
+            ])
+        self.assertEqual(code, 0)
+        self.assertIn("Controlled Jev benchmark preview", output)
+        self.assertIn("No benchmark was run", output)
+        self.assertIn("Measured repeats: 2", output)
 
 if __name__ == "__main__":
     unittest.main()
