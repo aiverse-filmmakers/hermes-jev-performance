@@ -125,7 +125,7 @@ def run_live_benchmark(
         "order_policy": "paired_alternating",
         "fixture_order": "stable",
         "read_only_default": True,
-        "network_included": bool(include_network),
+        "public_web_fixture_included": bool(include_network),
         "timeout_seconds": float(timeout_seconds),
         "sample_count": len(plan),
         "measured_sample_count": sum(1 for sample in plan if not sample.is_warmup),
@@ -239,7 +239,7 @@ def benchmark_plan_summary(
         "warmups": int(warmups),
         "total_turns": len(plan),
         "measured_turns": sum(1 for sample in plan if not sample.is_warmup),
-        "network_included": bool(include_network),
+        "public_web_fixture_included": bool(include_network),
         "modes": ["off", "on"],
         "order_policy": "paired_alternating",
     }
