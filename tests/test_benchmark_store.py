@@ -93,6 +93,13 @@ class BenchmarkStoreTests(unittest.TestCase):
             turn_key,
             {"input_tokens": input_tokens, "output_tokens": output_tokens},
         )
+        store.record_runtime_identity(
+            turn_key,
+            provider="synthetic-provider",
+            requested_model="synthetic-model",
+            response_model="synthetic-model-v1",
+            api_mode="synthetic-api",
+        )
         if mode == "on":
             store.record_decision(
                 turn_key=turn_key,
@@ -185,6 +192,10 @@ class BenchmarkStoreTests(unittest.TestCase):
         self.assertAlmostEqual(row["hermes_duration_ms"], 800, places=2)
         self.assertEqual(row["tool_calls"], 2)
         self.assertEqual(row["llm_requests"], 1)
+        self.assertEqual(row["hermes_provider"], "synthetic-provider")
+        self.assertEqual(row["hermes_requested_model"], "synthetic-model")
+        self.assertEqual(row["hermes_response_model"], "synthetic-model-v1")
+        self.assertEqual(row["hermes_api_mode"], "synthetic-api")
         self.assertEqual(row["route_family"], "files")
         self.assertTrue(row["route_applied"])
         self.assertEqual(row["jev_latency_ms"], 200)
@@ -246,6 +257,8 @@ class BenchmarkStoreTests(unittest.TestCase):
         self.assertNotIn("MUST_NOT_EXPORT", serialized)
         self.assertNotIn(str(path), serialized)
         self.assertNotIn("turn_key", serialized)
+        self.assertIn("synthetic-provider", serialized)
+        self.assertIn("synthetic-model-v1", serialized)
         self.assertFalse(payload["privacy"]["prompt_text_included"])
         self.assertFalse(payload["privacy"]["host_identifiers_included"])
 
