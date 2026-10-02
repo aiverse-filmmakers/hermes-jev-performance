@@ -78,11 +78,15 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             repeats = int(getattr(args, "repeats", 3))
             warmups = int(getattr(args, "warmups", 1))
             include_network = bool(getattr(args, "include_network", False))
-            plan = benchmark_plan_summary(
-                repeats=repeats,
-                warmups=warmups,
-                include_network=include_network,
-            )
+            try:
+                plan = benchmark_plan_summary(
+                    repeats=repeats,
+                    warmups=warmups,
+                    include_network=include_network,
+                )
+            except ValueError as exc:
+                print(f"Benchmark configuration error: {exc}")
+                return 2
             if not bool(getattr(args, "live", False)):
                 print("Controlled Jev benchmark preview")
                 print(f"Fixtures: {plan['fixture_count']} ({', '.join(plan['fixtures'])})")
@@ -95,14 +99,21 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print("No benchmark was run. Add --live to execute paid/local Hermes turns.")
                 return 0
 
-            report = run_live_benchmark(
-                ctx,
-                telemetry,
-                repeats=repeats,
-                warmups=warmups,
-                include_network=include_network,
-                timeout_seconds=float(getattr(args, "timeout", 180.0)),
-            )
+            try:
+                report = run_live_benchmark(
+                    ctx,
+                    telemetry,
+                    repeats=repeats,
+                    warmups=warmups,
+                    include_network=include_network,
+                    timeout_seconds=float(getattr(args, "timeout", 180.0)),
+                )
+            except (ValueError, RuntimeError) as exc:
+                print(f"Benchmark failed: {exc}")
+                return 2
+            except Exception:
+                print("Benchmark failed: unexpected runner error")
+                return 2
             run = report["run"]
             comparison = report["comparison"]
             print(f"Benchmark run: {run['run_id']}")
