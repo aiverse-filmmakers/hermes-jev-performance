@@ -154,6 +154,50 @@ class StoreTests(unittest.TestCase):
         stats = store.summary(since_hours=1000, now=200001)
         self.assertEqual(stats.turns, 1)
 
+    def test_retention_does_not_orphan_newer_benchmark_sample(self):
+        store, path = self.make_store()
+        store.start_benchmark_run(
+            run_id="long-run",
+            benchmark_version=1,
+            fixture_set_hash="a" * 64,
+            fixture_count=1,
+            repeats=2,
+            warmups=0,
+            environment={},
+            methodology={},
+            now=0,
+        )
+        store.plan_benchmark_sample(
+            sample_id="newer-sample",
+            run_id="long-run",
+            fixture_id="fixture",
+            family="none",
+            mode="off",
+            repeat_index=0,
+            order_index=0,
+            is_warmup=False,
+            now=200000,
+        )
+        store.cleanup(1, now=200001)
+        with sqlite3.connect(path) as con:
+            run_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_runs WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+            sample_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_samples WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+        self.assertEqual((run_count, sample_count), (1, 1))
+
+        store.cleanup(1, now=400000)
+        with sqlite3.connect(path) as con:
+            run_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_runs WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+            sample_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_samples WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+        self.assertEqual((run_count, sample_count), (0, 0))
+
     def test_schema_has_no_content_columns(self):
         store, path = self.make_store()
         store.initialize()
