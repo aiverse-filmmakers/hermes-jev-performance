@@ -29,18 +29,6 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
     persistent_settings = "available" if compat["persistent_settings_ready"] else "unavailable"
     warnings = ", ".join(config.warnings) if config.warnings else "none"
 
-    last = getattr(router_middleware, "last_decision", None)
-    if last is None:
-        last_route = "none yet"
-    else:
-        confidence = (
-            f"{last.confidence:.2f}"
-            if isinstance(last.confidence, (int, float))
-            else "n/a"
-        )
-        last_route = f"{last.family or 'fallback'} ({confidence}, {last.reason})"
-
-    filter_reason = getattr(router_middleware, "last_filter_reason", None) or "none yet"
 
     return "\n".join(
         [
@@ -56,8 +44,6 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
             f"Hermes compatibility: {compatibility}",
             f"Routing middleware surface: {routing_surface}",
             f"Persistent settings surface: {persistent_settings}",
-            f"Last route: {last_route}",
-            f"Last filter state: {filter_reason}",
             f"Config warnings: {warnings}",
             "Phase: 9 (hardening + packaging)",
         ]
