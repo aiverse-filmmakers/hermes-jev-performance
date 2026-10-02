@@ -11,9 +11,13 @@ import time
 from typing import Any
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 PLUGIN_DATA_DIR = "hermes-jev-performance"
 DB_FILENAME = "metrics.sqlite3"
+
+
+class StoreSchemaError(RuntimeError):
+    """The local metrics DB schema is newer than this plugin understands."""
 
 
 def _fallback_hermes_home() -> Path:
@@ -85,6 +89,102 @@ class MetricsStore:
         connection.execute("PRAGMA synchronous = NORMAL")
         return connection
 
+    def _schema_version(self, con: sqlite3.Connection) -> int:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        row = con.execute(
+            "SELECT value FROM meta WHERE key = 'schema_version'"
+        ).fetchone()
+        if row is None:
+            return 0
+        try:
+            return int(row["value"])
+        except (TypeError, ValueError):
+            return 0
+
+    def _set_schema_version(self, con: sqlite3.Connection, version: int) -> None:
+        con.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)",
+            (str(version),),
+        )
+
+    def _migrate_v1(self, con: sqlite3.Connection) -> None:
+        con.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS jev_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                turn_key TEXT NOT NULL UNIQUE,
+                created_at REAL NOT NULL,
+                mode TEXT NOT NULL,
+                provider TEXT,
+                requested_model TEXT,
+                actual_model TEXT,
+                family TEXT,
+                confidence REAL,
+                latency_ms REAL,
+                cost_usd REAL,
+                input_tokens INTEGER,
+                output_tokens INTEGER,
+                accepted INTEGER NOT NULL DEFAULT 0,
+                applied INTEGER NOT NULL DEFAULT 0,
+                reason TEXT NOT NULL,
+                error_category TEXT,
+                error_status_code INTEGER
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_jev_decisions_created
+            ON jev_decisions(created_at);
+
+            CREATE INDEX IF NOT EXISTS idx_jev_decisions_family
+            ON jev_decisions(family);
+
+            CREATE TABLE IF NOT EXISTS hermes_turns (
+                turn_key TEXT PRIMARY KEY,
+                started_at REAL NOT NULL,
+                completed_at REAL,
+                mode TEXT NOT NULL,
+                route_family TEXT,
+                route_applied INTEGER NOT NULL DEFAULT 0,
+                duration_ms REAL,
+                llm_requests INTEGER NOT NULL DEFAULT 0,
+                tool_calls INTEGER NOT NULL DEFAULT 0,
+                input_tokens INTEGER,
+                cached_input_tokens INTEGER,
+                output_tokens INTEGER,
+                reasoning_tokens INTEGER,
+                status TEXT NOT NULL DEFAULT 'running'
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_hermes_turns_started
+            ON hermes_turns(started_at);
+
+            CREATE INDEX IF NOT EXISTS idx_hermes_turns_mode
+            ON hermes_turns(mode);
+
+            CREATE TABLE IF NOT EXISTS mode_changes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at REAL NOT NULL,
+                old_mode TEXT NOT NULL,
+                new_mode TEXT NOT NULL,
+                source TEXT NOT NULL
+            );
+            """
+        )
+
+    def _migrate_v2(self, con: sqlite3.Connection) -> None:
+        columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(hermes_turns)").fetchall()
+        }
+        if "route_reason" not in columns:
+            con.execute("ALTER TABLE hermes_turns ADD COLUMN route_reason TEXT")
+
     def initialize(self) -> None:
         if self._initialized:
             return
@@ -92,77 +192,18 @@ class MetricsStore:
             if self._initialized:
                 return
             with self._connect() as con:
-                con.executescript(
-                    """
-                    CREATE TABLE IF NOT EXISTS meta (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL
-                    );
-
-                    CREATE TABLE IF NOT EXISTS jev_decisions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        turn_key TEXT NOT NULL UNIQUE,
-                        created_at REAL NOT NULL,
-                        mode TEXT NOT NULL,
-                        provider TEXT,
-                        requested_model TEXT,
-                        actual_model TEXT,
-                        family TEXT,
-                        confidence REAL,
-                        latency_ms REAL,
-                        cost_usd REAL,
-                        input_tokens INTEGER,
-                        output_tokens INTEGER,
-                        accepted INTEGER NOT NULL DEFAULT 0,
-                        applied INTEGER NOT NULL DEFAULT 0,
-                        reason TEXT NOT NULL,
-                        error_category TEXT,
-                        error_status_code INTEGER
-                    );
-
-                    CREATE INDEX IF NOT EXISTS idx_jev_decisions_created
-                    ON jev_decisions(created_at);
-
-                    CREATE INDEX IF NOT EXISTS idx_jev_decisions_family
-                    ON jev_decisions(family);
-
-                    CREATE TABLE IF NOT EXISTS hermes_turns (
-                        turn_key TEXT PRIMARY KEY,
-                        started_at REAL NOT NULL,
-                        completed_at REAL,
-                        mode TEXT NOT NULL,
-                        route_family TEXT,
-                        route_applied INTEGER NOT NULL DEFAULT 0,
-                        route_reason TEXT,
-                        duration_ms REAL,
-                        llm_requests INTEGER NOT NULL DEFAULT 0,
-                        tool_calls INTEGER NOT NULL DEFAULT 0,
-                        input_tokens INTEGER,
-                        cached_input_tokens INTEGER,
-                        output_tokens INTEGER,
-                        reasoning_tokens INTEGER,
-                        status TEXT NOT NULL DEFAULT 'running'
-                    );
-
-                    CREATE INDEX IF NOT EXISTS idx_hermes_turns_started
-                    ON hermes_turns(started_at);
-
-                    CREATE INDEX IF NOT EXISTS idx_hermes_turns_mode
-                    ON hermes_turns(mode);
-
-                    CREATE TABLE IF NOT EXISTS mode_changes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        created_at REAL NOT NULL,
-                        old_mode TEXT NOT NULL,
-                        new_mode TEXT NOT NULL,
-                        source TEXT NOT NULL
-                    );
-                    """
-                )
-                con.execute(
-                    "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)",
-                    (str(SCHEMA_VERSION),),
-                )
+                version = self._schema_version(con)
+                if version > SCHEMA_VERSION:
+                    raise StoreSchemaError(
+                        f"metrics schema {version} is newer than supported {SCHEMA_VERSION}"
+                    )
+                if version < 1:
+                    self._migrate_v1(con)
+                    self._set_schema_version(con, 1)
+                    version = 1
+                if version < 2:
+                    self._migrate_v2(con)
+                    self._set_schema_version(con, 2)
             self._initialized = True
 
     def touch_turn(self, turn_key: str, mode: str, *, now: float | None = None) -> None:
