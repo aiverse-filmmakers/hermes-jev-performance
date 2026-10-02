@@ -217,3 +217,15 @@ Phase 9 additionally requires:
 - CI public-repository privacy/secret scan.
 
 The P9 live lifecycle gate is manual by design: install, enable, disable, re-enable and remove must be exercised through Hermes' actual plugin lifecycle on a supported installation before public beta.
+
+## 11. Batched live release gate
+
+`scripts/live_release_gate.py` is the canonical P1-P9 real-environment runner.
+
+Default execution is read-only on the active profile.
+
+`--lifecycle --ref <FULL_COMMIT_SHA>` runs clean install, doctor, disable, re-enable, mode cycling and removal inside an isolated temporary `HERMES_HOME`.
+
+`--live-jev` adds one explicit provider call. `--active-agent` adds real OFF/SHADOW/ON Hermes turns and restores the original mode.
+
+The remaining Telegram and dashboard UI confirmations stay manual and must not be inferred from headless CI.
