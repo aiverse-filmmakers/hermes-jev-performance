@@ -77,8 +77,12 @@ hermes-jev-performance/
 │   ├── families.py          # family definitions and tool policy registry
 │   ├── middleware.py        # Hermes llm_request integration
 │   ├── commands.py          # /jev command parser/rendering
+│   ├── benchmark.py         # fixture planning + paired delta math
+│   ├── benchmark_context.py # process-scoped benchmark correlation/mode
+│   ├── benchmark_runner.py  # explicit local read-only live runner
+│   ├── benchmark_export.py  # anonymized JSON export
 │   ├── telemetry.py         # event creation and aggregation
-│   ├── store.py             # SQLite schema/access
+│   ├── store.py             # SQLite schema/access + benchmark storage
 │   ├── compatibility.py     # Hermes capability/version detection
 │   ├── doctor.py            # diagnostics
 │   └── types.py             # internal typed records
@@ -316,10 +320,51 @@ The `Jev Performance` tab is a pre-built Hermes SDK IIFE with theme-aware CSS. I
 - Hermes turn-duration, tool-call, LLM-request and token time-series charts;
 - recent Jev decision metadata;
 - OFF / SHADOW / ON observational comparison;
+- controlled matched benchmark results;
+- anonymized benchmark JSON export;
 - 24h / 7d / 30d ranges;
 - responsive/mobile layout.
 
-The UI labels ordinary mode comparisons as observational/not causal. Controlled benchmark results are reserved for Phase 8.
+The UI keeps ordinary usage labelled observational/not causal and renders controlled matched benchmark data in a separate section.
+
+## 12.2 Controlled benchmark architecture
+
+Phase 8 adds:
+
+```text
+hermes jev benchmark
+        |
+        | preview only by default
+        v
+read-only fixture suite
+        |
+        | --live explicitly required
+        v
+benchmark runner
+        |
+        +--> spawned Hermes process [OFF override]
+        |
+        +--> spawned Hermes process [ON override]
+        |
+        v
+benchmark-tagged Hermes telemetry
+        |
+        v
+SQLite schema v3
+  - benchmark_runs
+  - benchmark_samples
+  - benchmark tags on hermes_turns
+        |
+        +--> paired delta engine
+        +--> dashboard benchmark section
+        +--> anonymized JSON export
+```
+
+The runner never changes the user's persistent Jev mode. OFF/ON is passed only to the spawned benchmark process after a full validated benchmark context is present.
+
+Warm-ups are tagged and excluded from deltas. Measured pairs are matched by fixture ID plus repeat index. Mode order alternates on subsequent repeats to reduce simple time/provider drift.
+
+Organic dashboard queries require `benchmark_run_id IS NULL`, so benchmark traffic cannot pollute ordinary usage charts.
 
 ## 13. Gateway/Telegram architecture
 
