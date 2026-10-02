@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 PLUGIN_DATA_DIR = "hermes-jev-performance"
 DB_FILENAME = "metrics.sqlite3"
 
@@ -365,6 +365,39 @@ class MetricsStore:
             """
         )
 
+    def _migrate_v4(self, con: sqlite3.Connection) -> None:
+        turn_columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(hermes_turns)").fetchall()
+        }
+        turn_additions = {
+            "provider": "TEXT",
+            "requested_model": "TEXT",
+            "response_model": "TEXT",
+            "api_mode": "TEXT",
+        }
+        for name, sql_type in turn_additions.items():
+            if name not in turn_columns:
+                con.execute(
+                    f"ALTER TABLE hermes_turns ADD COLUMN {name} {sql_type}"
+                )
+
+        sample_columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(benchmark_samples)").fetchall()
+        }
+        sample_additions = {
+            "hermes_provider": "TEXT",
+            "hermes_requested_model": "TEXT",
+            "hermes_response_model": "TEXT",
+            "hermes_api_mode": "TEXT",
+        }
+        for name, sql_type in sample_additions.items():
+            if name not in sample_columns:
+                con.execute(
+                    f"ALTER TABLE benchmark_samples ADD COLUMN {name} {sql_type}"
+                )
+
     def initialize(self) -> None:
         if self._initialized:
             return
@@ -388,6 +421,10 @@ class MetricsStore:
                 if version < 3:
                     self._migrate_v3(con)
                     self._set_schema_version(con, 3)
+                    version = 3
+                if version < 4:
+                    self._migrate_v4(con)
+                    self._set_schema_version(con, 4)
             self._initialized = True
 
     def touch_turn(
@@ -501,6 +538,44 @@ class MetricsStore:
             con.execute(
                 "UPDATE hermes_turns SET llm_requests = llm_requests + 1 WHERE turn_key = ?",
                 (turn_key,),
+            )
+
+    def record_runtime_identity(
+        self,
+        turn_key: str,
+        *,
+        provider: Any = None,
+        requested_model: Any = None,
+        response_model: Any = None,
+        api_mode: Any = None,
+    ) -> None:
+        """Store the first successful main-loop provider/model identity for a turn."""
+        def clean(value: Any) -> str | None:
+            if not isinstance(value, str):
+                return None
+            value = value.strip()
+            return value[:256] if value else None
+
+        values = (
+            clean(provider),
+            clean(requested_model),
+            clean(response_model),
+            clean(api_mode),
+        )
+        if all(value is None for value in values):
+            return
+        self.initialize()
+        with self._connection() as con:
+            con.execute(
+                """
+                UPDATE hermes_turns
+                SET provider = COALESCE(provider, ?),
+                    requested_model = COALESCE(requested_model, ?),
+                    response_model = COALESCE(response_model, ?),
+                    api_mode = COALESCE(api_mode, ?)
+                WHERE turn_key = ?
+                """,
+                (*values, turn_key),
             )
 
     def add_usage(self, turn_key: str, usage: dict[str, Any] | None) -> None:
@@ -1107,6 +1182,10 @@ class MetricsStore:
                     cached_input_tokens = ?,
                     output_tokens = ?,
                     reasoning_tokens = ?,
+                    hermes_provider = ?,
+                    hermes_requested_model = ?,
+                    hermes_response_model = ?,
+                    hermes_api_mode = ?,
                     route_family = ?,
                     route_applied = ?,
                     jev_latency_ms = ?,
@@ -1128,6 +1207,10 @@ class MetricsStore:
                     _integer(turn["cached_input_tokens"]) if turn is not None else None,
                     _integer(turn["output_tokens"]) if turn is not None else None,
                     _integer(turn["reasoning_tokens"]) if turn is not None else None,
+                    turn["provider"] if turn is not None else None,
+                    turn["requested_model"] if turn is not None else None,
+                    turn["response_model"] if turn is not None else None,
+                    turn["api_mode"] if turn is not None else None,
                     turn["route_family"] if turn is not None else None,
                     int(turn["route_applied"] or 0) if turn is not None else None,
                     _number(decision["latency_ms"]) if decision is not None else None,
@@ -1171,6 +1254,10 @@ class MetricsStore:
             "cached_input_tokens": _integer(row["cached_input_tokens"]),
             "output_tokens": _integer(row["output_tokens"]),
             "reasoning_tokens": _integer(row["reasoning_tokens"]),
+            "hermes_provider": row["hermes_provider"],
+            "hermes_requested_model": row["hermes_requested_model"],
+            "hermes_response_model": row["hermes_response_model"],
+            "hermes_api_mode": row["hermes_api_mode"],
             "route_family": row["route_family"],
             "route_applied": (
                 None if row["route_applied"] is None else bool(row["route_applied"])
