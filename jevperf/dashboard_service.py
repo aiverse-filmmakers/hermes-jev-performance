@@ -178,3 +178,53 @@ def set_dashboard_mode(
         "previous_mode": before,
         "mode": after,
     }
+
+
+def analytics_payload(
+    *,
+    hours: int = 24,
+    limit: int = 30,
+    store: MetricsStore | None = None,
+) -> dict[str, Any]:
+    """Dashboard analytics payload with aggregates only and no correlation keys."""
+    bounded_hours = max(1, min(int(hours), 24 * 3650))
+    bounded_limit = max(1, min(int(limit), 200))
+    db_path = default_db_path() if store is None else store.path
+
+    if store is None and not db_path.exists():
+        return {
+            "hours": bounded_hours,
+            "database_state": "empty",
+            "routes": [],
+            "reasons": [],
+            "comparison": [
+                {"mode": mode, "turns": 0, "completed": 0, "errors": 0,
+                 "avg_duration_ms": None, "avg_tool_calls": None,
+                 "avg_llm_requests": None, "avg_input_tokens": None,
+                 "avg_cached_input_tokens": None, "avg_output_tokens": None,
+                 "avg_reasoning_tokens": None, "decisions": 0, "applied": 0,
+                 "avg_jev_latency_ms": None, "avg_jev_confidence": None,
+                 "total_jev_cost_usd": None}
+                for mode in ("off", "shadow", "on")
+            ],
+            "series": [],
+            "recent": [],
+        }
+
+    active = store or MetricsStore(db_path)
+    summary = active.summary(since_hours=bounded_hours)
+    return {
+        "hours": bounded_hours,
+        "database_state": "ready",
+        "routes": [
+            {"family": family, "count": count}
+            for family, count in summary.routes
+        ],
+        "reasons": active.reason_breakdown(since_hours=bounded_hours),
+        "comparison": active.mode_comparison(since_hours=bounded_hours),
+        "series": active.time_series(since_hours=bounded_hours),
+        "recent": active.recent_decisions(
+            since_hours=bounded_hours,
+            limit=bounded_limit,
+        ),
+    }
