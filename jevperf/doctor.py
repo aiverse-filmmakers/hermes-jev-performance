@@ -19,6 +19,7 @@ from .compatibility import (
     SUPPORTED_PYTHON_MIN,
     detect_compatibility,
     detect_hermes_version,
+    version_meets_floor,
 )
 from .config import read_config
 from .credentials import resolve_openrouter_credential
@@ -134,13 +135,35 @@ def run_doctor(
     )
 
     hermes_version = detect_hermes_version()
-    checks.append(
-        _check(
-            "hermes_version",
-            "pass" if hermes_version else "warn",
-            hermes_version or "version identity unavailable; feature detection remains authoritative",
+    meets_floor = version_meets_floor(hermes_version)
+    if hermes_version is None:
+        checks.append(
+            _check(
+                "hermes_version",
+                "warn",
+                "version identity unavailable; feature detection remains authoritative",
+            )
         )
-    )
+    elif meets_floor is False:
+        checks.append(
+            _check(
+                "hermes_version",
+                "fail",
+                f"{hermes_version} is below required {MIN_HERMES_VERSION}",
+            )
+        )
+    else:
+        checks.append(
+            _check(
+                "hermes_version",
+                "pass" if meets_floor is True else "warn",
+                (
+                    f"{hermes_version} meets required >= {MIN_HERMES_VERSION}"
+                    if meets_floor is True
+                    else f"{hermes_version}; unable to parse against required {MIN_HERMES_VERSION}"
+                ),
+            )
+        )
 
     checks.append(_python_check())
 
