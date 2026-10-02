@@ -21,9 +21,6 @@ def load_root_plugin():
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
 
-    # Relative imports in a directory plugin require the package to exist in
-    # sys.modules while its root __init__.py executes, which mirrors normal
-    # package/plugin loading semantics.
     previous = sys.modules.get(name)
     sys.modules[name] = module
     try:
@@ -37,25 +34,40 @@ def load_root_plugin():
 
 
 class PluginTests(unittest.TestCase):
-    def test_registers_only_jev_command_and_does_not_touch_network(self):
+    def test_registers_runtime_surfaces_without_network(self):
         module = load_root_plugin()
         ctx = FakeContext()
 
         with mock.patch.object(
             socket,
             "socket",
-            side_effect=AssertionError("network access during Phase 1 registration"),
+            side_effect=AssertionError("network access during plugin registration"),
         ):
             module.register(ctx)
 
         self.assertEqual(set(ctx.commands), {"jev"})
         self.assertEqual(set(ctx.middleware), {"llm_request"})
         self.assertEqual(len(ctx.middleware["llm_request"]), 1)
+        self.assertEqual(
+            set(ctx.hooks),
+            {
+                "pre_api_request",
+                "post_api_request",
+                "post_tool_call",
+                "on_session_end",
+                "transform_llm_output",
+            },
+        )
+        self.assertEqual(set(ctx.cli_commands), {"jev"})
+
         command = ctx.commands["jev"]
-        self.assertEqual(command["args_hint"], "[status|help]")
+        self.assertEqual(
+            command["args_hint"],
+            "[status|on|off|shadow|stats|notice on|notice off|help]",
+        )
         self.assertIn("routing/performance", command["description"])
 
-    def test_command_handler_is_read_only_and_network_free(self):
+    def test_status_command_is_network_free(self):
         module = load_root_plugin()
         ctx = FakeContext()
         module.register(ctx)
@@ -64,13 +76,22 @@ class PluginTests(unittest.TestCase):
         with mock.patch.object(
             socket,
             "socket",
-            side_effect=AssertionError("network access during Phase 1 status"),
+            side_effect=AssertionError("network access during status"),
         ):
             output = ctx.commands["jev"]["handler"]("status")
 
         self.assertEqual(ctx.settings, before)
-        self.assertIn("Phase: 4 (routing middleware)", output)
+        self.assertIn("Phase: 6 (controls + telemetry)", output)
         self.assertIn("Last route: none yet", output)
+
+    def test_degrades_without_optional_hook_and_cli_surfaces(self):
+        module = load_root_plugin()
+        ctx = FakeContext(hooks=False, cli=False)
+        module.register(ctx)
+        self.assertEqual(set(ctx.commands), {"jev"})
+        self.assertEqual(set(ctx.middleware), {"llm_request"})
+        self.assertEqual(ctx.hooks, {})
+        self.assertEqual(ctx.cli_commands, {})
 
 
 if __name__ == "__main__":
