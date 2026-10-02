@@ -78,6 +78,13 @@ class DashboardBenchmarkTests(unittest.TestCase):
             )
             store.increment_llm_request(turn_key)
             store.increment_tool_call(turn_key)
+            store.record_runtime_identity(
+                turn_key,
+                provider="synthetic-provider",
+                requested_model="synthetic-model",
+                response_model="synthetic-model-v1",
+                api_mode="synthetic-api",
+            )
             store.add_usage(
                 turn_key,
                 {
@@ -112,6 +119,9 @@ class DashboardBenchmarkTests(unittest.TestCase):
         self.assertEqual(len(payload["runs"]), 1)
         run = payload["runs"][0]
         self.assertEqual(run["comparison"]["matched_pairs"], 2)
+        self.assertEqual(run["hermes_providers"], ["synthetic-provider"])
+        self.assertEqual(run["hermes_models"], ["synthetic-model-v1"])
+        self.assertEqual(run["hermes_api_modes"], ["synthetic-api"])
         serialized = repr(payload)
         self.assertNotIn("private-sample", serialized)
         self.assertNotIn("private-turn", serialized)
