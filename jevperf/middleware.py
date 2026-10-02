@@ -148,6 +148,13 @@ class RoutingMiddleware:
                 self.last_decision = None
                 self.last_filter_reason = "mode_off"
                 self._remember_session(session_id, None, mode=config.mode, reason="mode_off")
+                self._telemetry_call(
+                    "record_turn_reason",
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    mode=config.mode,
+                    reason="mode_off",
+                )
                 return None
 
             if key is None:
@@ -165,6 +172,13 @@ class RoutingMiddleware:
                 self._remember_session(
                     session_id,
                     None,
+                    mode=config.mode,
+                    reason="missing_user_state",
+                )
+                self._telemetry_call(
+                    "record_turn_reason",
+                    session_id=session_id,
+                    turn_id=turn_id,
                     mode=config.mode,
                     reason="missing_user_state",
                 )
