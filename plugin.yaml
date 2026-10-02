@@ -1,0 +1,42 @@
+name: hermes-jev-performance
+version: 0.1.0-alpha.1
+manifest_version: 2
+api_version: 1
+description: Hermes-native Jev tool routing and performance observability.
+license: MIT
+homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
+tags: [jev, routing, observability, performance, openrouter]
+
+config_schema:
+  mode:
+    type: str
+    default: shadow
+    description: "Routing mode: off, shadow, or on."
+  provider:
+    type: str
+    default: openrouter
+    description: "Jev provider identifier. v1 supports OpenRouter."
+  model:
+    type: str
+    default: typesafe/jev-1.13
+    description: "Jev model identifier used by the configured provider."
+  min_confidence:
+    type: float
+    default: 0.70
+    description: "Minimum confidence required before an ON-mode route may be applied."
+  timeout_seconds:
+    type: float
+    default: 2.5
+    description: "Maximum Jev decision request duration in seconds."
+  notice:
+    type: bool
+    default: false
+    description: "Whether replies may show a concise Jev routing notice."
+  retention_days:
+    type: int
+    default: 30
+    description: "Local performance telemetry retention period in days."
+  telemetry_enabled:
+    type: bool
+    default: true
+    description: "Whether local metadata-only performance telemetry is enabled."
