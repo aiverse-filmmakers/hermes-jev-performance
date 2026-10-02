@@ -122,6 +122,35 @@ class TelemetryTests(unittest.TestCase):
         self.assertIsNotNone(row[1])
         self.assertIsNotNone(row[2])
 
+    def test_post_api_request_records_runtime_identity_metadata(self):
+        observer, path = self.make_observer()
+        observer.on_pre_api_request(session_id="s", turn_id="t")
+        observer.on_post_api_request(
+            session_id="s",
+            turn_id="t",
+            provider="openai-codex",
+            model="gpt-5.6-codex",
+            response_model="gpt-5.6-codex-2026-09",
+            api_mode="codex_responses",
+            usage={"input_tokens": 10, "output_tokens": 2},
+        )
+        with sqlite3.connect(path) as con:
+            row = con.execute(
+                """
+                SELECT provider, requested_model, response_model, api_mode
+                FROM hermes_turns
+                """
+            ).fetchone()
+        self.assertEqual(
+            row,
+            (
+                "openai-codex",
+                "gpt-5.6-codex",
+                "gpt-5.6-codex-2026-09",
+                "codex_responses",
+            ),
+        )
+
     def test_disabled_telemetry_creates_no_database(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
