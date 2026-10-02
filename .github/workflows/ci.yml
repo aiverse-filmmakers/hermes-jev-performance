@@ -27,5 +27,7 @@ jobs:
         run: python -m compileall -q __init__.py jevperf dashboard tests
       - name: Check dashboard JavaScript
         run: node --check dashboard/dist/index.js
+      - name: Public repository scan
+        run: python scripts/public_repo_scan.py .
       - name: Unit tests
         run: python -m unittest discover -s tests -v
