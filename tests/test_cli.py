@@ -83,6 +83,38 @@ class CliTests(unittest.TestCase):
         self.assertIn("Controlled Jev benchmark preview", output)
         self.assertIn("No benchmark was run", output)
         self.assertIn("Measured repeats: 2", output)
+    def test_cli_doctor_renders_safe_report(self):
+        report = {
+            "plugin": "hermes-jev-performance",
+            "version": "test",
+            "overall": "pass",
+            "counts": {"pass": 1, "warn": 0, "fail": 0},
+            "checks": [
+                {"name": "configuration", "status": "pass", "detail": "ok"},
+            ],
+            "network_calls": 0,
+            "secrets_printed": False,
+        }
+        with mock.patch("jevperf.cli.run_doctor", return_value=report):
+            code, output, _, _ = self.parse_and_run(["doctor"])
+        self.assertEqual(code, 0)
+        self.assertIn("Hermes Jev Performance doctor", output)
+        self.assertIn("Network calls: 0", output)
+
+    def test_cli_doctor_json_is_machine_readable(self):
+        report = {
+            "plugin": "hermes-jev-performance",
+            "version": "test",
+            "overall": "warn",
+            "counts": {"pass": 1, "warn": 1, "fail": 0},
+            "checks": [],
+            "network_calls": 0,
+            "secrets_printed": False,
+        }
+        with mock.patch("jevperf.cli.run_doctor", return_value=report):
+            code, output, _, _ = self.parse_and_run(["doctor", "--json"])
+        self.assertEqual(code, 0)
+        self.assertIn('"overall": "warn"', output)
 
 if __name__ == "__main__":
     unittest.main()
