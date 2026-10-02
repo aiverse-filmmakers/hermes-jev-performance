@@ -6,6 +6,14 @@ description: Hermes-native Jev tool routing and performance observability.
 license: MIT
 homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
 tags: [jev, routing, observability, performance, openrouter]
+provides_middleware:
+  - llm_request
+provides_hooks:
+  - pre_api_request
+  - post_api_request
+  - post_tool_call
+  - on_session_end
+  - transform_llm_output
 
 config_schema:
   mode:
