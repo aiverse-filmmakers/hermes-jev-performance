@@ -399,3 +399,24 @@ Compatibility states:
 ## 16. Separation of concerns
 
 The routing path must not depend on the dashboard. The dashboard must not be required for `/jev` commands. Telemetry failure must not break routing. Jev failure must not break Hermes.
+
+
+## 17. Packaging and hardening
+
+Phase 9 uses Hermes' native plugin lifecycle rather than a project-specific installer. The manifest declares `requires_hermes: ">=0.21.5"`, while runtime feature detection remains authoritative.
+
+The plugin intentionally declares no third-party Python runtime dependencies. It uses Python's standard library plus public Hermes runtime APIs.
+
+### 17.1 Diagnostics
+
+The plugin provides local diagnostics through the Jev command surfaces. Checks cover Hermes public plugin capabilities, version identity when available, Python compatibility, config validation, credential presence without returning secret values, dashboard assets, benchmark fixtures and telemetry database health.
+
+Diagnostics make zero provider/network calls.
+
+### 17.2 Telemetry recovery
+
+A corrupt metrics database never causes automatic deletion. Routing remains independent of telemetry. Explicit operator recovery quarantines damaged SQLite files before creating a clean current schema.
+
+### 17.3 Repository gate
+
+CI runs a conservative public-repository scanner before unit tests. It reports only rule identifiers and file paths, not matched secret values.
