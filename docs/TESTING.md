@@ -1,0 +1,178 @@
+# Testing Strategy
+
+## 1. Testing philosophy
+
+The plugin sits on the agent request path, so correctness means more than "Jev returned a route." Tests must prove that routing is conservative, failures are harmless, telemetry is content-free, and disabling the plugin truly restores normal Hermes behavior.
+
+## 2. Test layers
+
+### Unit tests
+
+Cover pure modules without Hermes or network:
+
+- config validation;
+- mode parsing/persistence;
+- family criteria;
+- route parser;
+- confidence threshold;
+- tool registry/filter;
+- `multi` behavior;
+- error normalization;
+- telemetry event construction;
+- aggregation math;
+- retention queries;
+- slash-command parser.
+
+### Contract tests
+
+Mock OpenRouter Decisions responses:
+
+- valid choice/confidence/usage;
+- missing confidence;
+- model alias/version changes;
+- 400/401/402/429/500;
+- timeout;
+- malformed JSON;
+- missing answers;
+- unknown family;
+- cost absent;
+- usage absent.
+
+### Hermes integration tests
+
+Use synthetic request/tool schemas to verify:
+
+- middleware returns unchanged request in OFF;
+- SHADOW calls Jev but returns unchanged tools;
+- ON filters accepted route;
+- subsequent LLM calls reuse one turn decision;
+- model/provider settings are unchanged;
+- failure returns original request;
+- family with zero matching tools returns original request;
+- unknown tools follow configured safe policy.
+
+### Dashboard tests
+
+- manifest discovery;
+- API status response;
+- API aggregate queries;
+- mode change + read-back;
+- invalid mode rejected;
+- dashboard never returns secrets/content;
+- responsive smoke test where feasible.
+
+### Gateway command tests
+
+- `/jev`;
+- `/jev status`;
+- `/jev on|off|shadow`;
+- `/jev notice on|off`;
+- `/jev stats`;
+- malformed command;
+- state persists across plugin reload.
+
+## 3. Routing fixture suite
+
+At minimum include clear examples for:
+
+1. github
+2. apps
+3. web
+4. terminal
+5. files
+6. memory
+7. skills
+8. media
+9. none
+10. multi
+
+Also include intentionally ambiguous prompts. The expected safe result may be `multi` or low-confidence fallback rather than forcing a family.
+
+## 4. Mixed-workflow regression set
+
+Required examples include requests conceptually equivalent to:
+
+- public web research then local file output;
+- GitHub inspection then web documentation research;
+- app retrieval then local processing;
+- local diagnostics then public error research;
+- media analysis then file report.
+
+These must never be hard-trapped by a single-family route unless the actual available tool architecture still permits all required steps.
+
+## 5. Failure injection
+
+Inject failures at every boundary:
+
+- Jev DNS/connect timeout;
+- provider 429;
+- invalid credential;
+- slow provider;
+- corrupted response;
+- SQLite locked/read-only;
+- dashboard asset missing;
+- dashboard API exception;
+- missing Hermes context fields;
+- unsupported Hermes API;
+- telemetry hook exception.
+
+Expected principle: **routing/observability may degrade; Hermes continues whenever Hermes itself can continue.**
+
+## 6. Privacy tests
+
+Automated tests should use marker secrets/content and assert they never appear in:
+
+- SQLite rows;
+- dashboard JSON;
+- `/jev stats`;
+- logs at normal verbosity;
+- exception strings returned to the user.
+
+## 7. Live smoke tests
+
+Live paid tests are opt-in and separate from CI.
+
+Minimum live smoke sequence:
+
+1. plugin doctor/import;
+2. explicit Jev API test;
+3. one SHADOW request;
+4. one ON clear-family request;
+5. one OFF request;
+6. verify no Jev API call in OFF;
+7. verify dashboard row/aggregates;
+8. verify `/jev` gateway control.
+
+## 8. Compatibility matrix
+
+For each supported Hermes release line:
+
+- plugin discovery;
+- middleware signature;
+- turn context fields;
+- command registration;
+- telemetry hooks;
+- dashboard plugin discovery/API;
+- disable/uninstall behavior.
+
+Unsupported versions must be documented rather than patched ad hoc.
+
+## 9. Release gates
+
+### Beta
+
+- all unit/contract tests green;
+- Hermes integration tests green;
+- fail-open suite green;
+- privacy tests green;
+- one supported Hermes version live-smoked;
+- dashboard functional;
+- uninstall verified.
+
+### Stable
+
+- compatibility matrix across declared supported versions;
+- benchmark methodology validated;
+- no open P0/P1 security or data-loss issues;
+- migrations tested from beta schema;
+- third-party attribution audit complete.
