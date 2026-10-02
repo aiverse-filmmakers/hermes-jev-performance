@@ -74,15 +74,15 @@ def _dashboard_check(root: Path) -> DoctorCheck:
 
 def _fixture_check(path: Path) -> DoctorCheck:
     try:
-        offline = load_fixture_suite(path, include_network=False)
+        local = load_fixture_suite(path, include_network=False)
         with_network = load_fixture_suite(path, include_network=True)
     except Exception:
         return _check("benchmark_fixtures", "fail", "read-only benchmark fixture suite is invalid")
-    network_count = max(0, len(with_network) - len(offline))
+    public_web_count = max(0, len(with_network) - len(local))
     return _check(
         "benchmark_fixtures",
         "pass",
-        f"{len(offline)} offline read-only fixture(s), {network_count} optional network fixture(s)",
+        f"{len(local)} local read-only workload fixture(s), {public_web_count} optional public-web fixture(s)",
     )
 
 
