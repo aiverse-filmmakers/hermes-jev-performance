@@ -81,7 +81,7 @@ Default read-only fixtures cover:
 - `files`: read the repository README heading without modification;
 - `skills`: inspect skill availability without modification.
 
-Optional network fixture:
+Optional public-web workload fixture:
 
 - `web`: public read-only lookup of the official Hermes Agent repository.
 
