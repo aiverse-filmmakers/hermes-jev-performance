@@ -6,10 +6,11 @@ from typing import Any
 
 from .compatibility import detect_compatibility
 from .config import VALID_MODES, read_config
+from .doctor import render_doctor, run_doctor
 
 
 USAGE = (
-    "Usage: /jev [status|on|off|shadow|stats|notice on|notice off|help]"
+    "Usage: /jev [status|on|off|shadow|stats|doctor|notice on|notice off|help]"
 )
 
 
@@ -23,7 +24,7 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
     config = read_config(ctx)
     compat = detect_compatibility(ctx)
 
-    compatibility = "supported" if compat["phase1_supported"] else "degraded"
+    compatibility = str(compat["level"])
     routing_surface = "available" if compat["routing_surface_ready"] else "unavailable"
     persistent_settings = "available" if compat["persistent_settings_ready"] else "unavailable"
     warnings = ", ".join(config.warnings) if config.warnings else "none"
@@ -58,7 +59,7 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
             f"Last route: {last_route}",
             f"Last filter state: {filter_reason}",
             f"Config warnings: {warnings}",
-            "Phase: 6 (controls + telemetry)",
+            "Phase: 9 (hardening + packaging)",
         ]
     )
 
@@ -152,6 +153,11 @@ def handle_jev_command(
         return set_mode(ctx, text, telemetry, source="slash")
     if text == "stats":
         return render_stats(telemetry)
+    if text == "doctor":
+        try:
+            return render_doctor(run_doctor(ctx))
+        except Exception:
+            return "Jev doctor unavailable: local diagnostics could not complete."
     if text == "notice on":
         return set_notice(ctx, True)
     if text == "notice off":
