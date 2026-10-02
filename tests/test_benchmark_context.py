@@ -5,9 +5,11 @@ from jevperf.benchmark_context import (
     RUN_ID_ENV,
     SAMPLE_ID_ENV,
     WARMUP_ENV,
+    MODE_ENV,
     BenchmarkContext,
     benchmark_env,
     read_benchmark_context,
+    read_benchmark_mode,
 )
 
 
@@ -19,8 +21,10 @@ class BenchmarkContextTests(unittest.TestCase):
             fixture_id="files-read-readme-heading",
             is_warmup=True,
         )
-        parsed = read_benchmark_context(benchmark_env(context))
+        env = benchmark_env(context, mode="on")
+        parsed = read_benchmark_context(env)
         self.assertEqual(parsed, context)
+        self.assertEqual(read_benchmark_mode(env), "on")
 
     def test_partial_context_is_ignored(self):
         self.assertIsNone(read_benchmark_context({RUN_ID_ENV: "bench-a"}))
@@ -34,6 +38,8 @@ class BenchmarkContextTests(unittest.TestCase):
         }
         self.assertIsNone(read_benchmark_context(env))
 
+    def test_mode_override_requires_full_valid_benchmark_context(self):
+        self.assertIsNone(read_benchmark_mode({MODE_ENV: "off"}))
 
 if __name__ == "__main__":
     unittest.main()
