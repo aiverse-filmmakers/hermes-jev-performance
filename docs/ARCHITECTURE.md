@@ -262,7 +262,7 @@ retention_days: 30
 telemetry_enabled: true
 ```
 
-Defaults must be reviewed during implementation. First install SHOULD prefer `shadow` rather than silently enabling routing.
+These are the implemented Phase 6 defaults. First install uses `shadow` rather than silently enabling behavioral routing.
 
 ## 11. Telemetry storage
 
@@ -277,7 +277,7 @@ Benefits:
 - easy retention deletion;
 - standard library dependency.
 
-Schema is defined in `TELEMETRY.md`.
+Schema is defined in `TELEMETRY.md`. The current schema is version 2 and is stored under the active Hermes profile's `plugin-data/hermes-jev-performance/` directory.
 
 ## 12. Dashboard architecture
 
