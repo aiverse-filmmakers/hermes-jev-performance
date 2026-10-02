@@ -93,6 +93,35 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(ctx.hooks, {})
         self.assertEqual(ctx.cli_commands, {})
 
+    def test_gateway_off_affects_next_turn_and_survives_reload(self):
+        module = load_root_plugin()
+        ctx = FakeContext({
+            "mode": "shadow",
+            "telemetry_enabled": False,
+        })
+        module.register(ctx)
+
+        reply = ctx.commands["jev"]["handler"]("off")
+        self.assertEqual(reply, "Jev routing: OFF")
+        self.assertEqual(ctx.settings["mode"], "off")
+
+        middleware = ctx.middleware["llm_request"][0]
+        result = middleware(
+            request={
+                "messages": [{"role": "user", "content": "search the web"}],
+                "tools": [{"type": "function", "name": "web_search"}],
+            },
+            session_id="session",
+            turn_id="turn",
+            api_call_count=1,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(middleware.last_filter_reason, "mode_off")
+
+        restarted = FakeContext(dict(ctx.settings))
+        module.register(restarted)
+        status = restarted.commands["jev"]["handler"]("status")
+        self.assertIn("Mode: off", status)
 
 if __name__ == "__main__":
     unittest.main()
