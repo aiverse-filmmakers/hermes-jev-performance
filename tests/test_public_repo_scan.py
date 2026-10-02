@@ -6,21 +6,54 @@ from scripts.public_repo_scan import scan_repository, scan_text
 
 
 class PublicRepoScanTests(unittest.TestCase):
-    def test_detects_secret_shapes_without_embedding_a_real_fixture_in_source(self):
-        token = "sk-" + "or-v1-" + ("A" * 24)
-        findings = scan_text(token)
-        self.assertIn("openrouter_token", findings)
+    def test_detects_secret_shapes_without_embedding_real_fixtures_in_source(self):
+        openrouter = "sk-" + "or-v1-" + ("A" * 24)
+        self.assertIn("openrouter_token", scan_text(openrouter))
+
+        openai = "sk-" + "proj-" + ("C" * 30)
+        self.assertIn("openai_token", scan_text(openai))
+
+        anthropic = "sk-" + "ant-api03-" + ("D" * 30)
+        self.assertIn("anthropic_token", scan_text(anthropic))
 
         github = "gh" + "p_" + ("B" * 30)
         self.assertIn("github_classic_token", scan_text(github))
 
-    def test_detects_non_placeholder_credential_assignment(self):
-        line = "OPENROUTER_API_KEY" + "=" + ("secret" + "value")
-        self.assertIn("credential_assignment", scan_text(line))
+        gitlab = "glpat-" + ("E" * 24)
+        self.assertIn("gitlab_token", scan_text(gitlab))
+
+        huggingface = "hf_" + ("F" * 30)
+        self.assertIn("huggingface_token", scan_text(huggingface))
+
+        google = "AIza" + ("G" * 35)
+        self.assertIn("google_api_key", scan_text(google))
+
+        aws = "AKIA" + ("H" * 16)
+        self.assertIn("aws_access_key", scan_text(aws))
+
+    def test_detects_broad_non_placeholder_credential_assignments(self):
+        cases = (
+            "OPENROUTER_API_KEY=secretvalue",
+            "OPENAI_API_KEY=secretvalue",
+            "ANTHROPIC_API_KEY=secretvalue",
+            "GOOGLE_API_KEY=secretvalue",
+            "MY_CLIENT_SECRET=secretvalue",
+            "AWS_SECRET_ACCESS_KEY=secretvalue",
+            "AWS_ACCESS_KEY_ID=secretvalue",
+        )
+        for line in cases:
+            with self.subTest(line=line.split("=", 1)[0]):
+                self.assertIn("credential_assignment", scan_text(line))
 
     def test_allows_documented_empty_or_placeholder_assignments(self):
-        self.assertEqual(scan_text("OPENROUTER_API_KEY" + "=<TOKEN>\n"), set())
-        self.assertEqual(scan_text("OPENROUTER_API_KEY" + '=""\n'), set())
+        for line in (
+            "OPENROUTER_API_KEY=<TOKEN>\n",
+            'OPENROUTER_API_KEY=""\n',
+            "OPENAI_API_KEY=${API_KEY}\n",
+            "MY_CLIENT_SECRET=<SECRET>\n",
+        ):
+            with self.subTest(line=line):
+                self.assertEqual(scan_text(line), set())
 
     def test_detects_cross_platform_personal_user_paths(self):
         linux = "/" + "home/example-user/.hermes/config.yaml"
