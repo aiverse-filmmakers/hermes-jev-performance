@@ -217,7 +217,7 @@ class StoreTests(unittest.TestCase):
                 }
                 self.assertTrue(forbidden.isdisjoint(columns))
 
-    def test_v1_database_migrates_through_v3(self):
+    def test_v1_database_migrates_through_v4(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         path = Path(temp.name) / "metrics.sqlite3"
@@ -260,9 +260,9 @@ class StoreTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertIn("route_reason", columns)
-        self.assertEqual(version, "3")
+        self.assertEqual(version, "4")
 
-    def test_v2_database_migrates_to_v3(self):
+    def test_v2_database_migrates_through_v4(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         path = Path(temp.name) / "metrics.sqlite3"
@@ -311,7 +311,7 @@ class StoreTests(unittest.TestCase):
                 "SELECT value FROM meta WHERE key = 'schema_version'"
             ).fetchone()[0]
 
-        self.assertEqual(version, "3")
+        self.assertEqual(version, "4")
         self.assertIn("benchmark_run_id", columns)
         self.assertIn("benchmark_sample_id", columns)
         self.assertIn("benchmark_fixture_id", columns)
@@ -319,7 +319,101 @@ class StoreTests(unittest.TestCase):
         self.assertIn("benchmark_runs", tables)
         self.assertIn("benchmark_samples", tables)
 
-    def test_schema_v3_initialize_is_idempotent(self):
+    def test_v3_database_migrates_to_v4(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = Path(temp.name) / "metrics.sqlite3"
+
+        with sqlite3.connect(path) as con:
+            con.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            con.execute(
+                "INSERT INTO meta(key, value) VALUES('schema_version', '3')"
+            )
+            con.execute(
+                """
+                CREATE TABLE hermes_turns (
+                    turn_key TEXT PRIMARY KEY,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    mode TEXT NOT NULL,
+                    route_family TEXT,
+                    route_applied INTEGER NOT NULL DEFAULT 0,
+                    duration_ms REAL,
+                    llm_requests INTEGER NOT NULL DEFAULT 0,
+                    tool_calls INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    route_reason TEXT,
+                    benchmark_run_id TEXT,
+                    benchmark_sample_id TEXT,
+                    benchmark_fixture_id TEXT,
+                    benchmark_warmup INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            con.execute(
+                """
+                CREATE TABLE benchmark_samples (
+                    sample_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    fixture_id TEXT NOT NULL,
+                    family TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    repeat_index INTEGER NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    is_warmup INTEGER NOT NULL DEFAULT 0,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    status TEXT NOT NULL,
+                    runner_duration_ms REAL,
+                    exit_code INTEGER,
+                    validation_passed INTEGER,
+                    hermes_duration_ms REAL,
+                    llm_requests INTEGER,
+                    tool_calls INTEGER,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    route_family TEXT,
+                    route_applied INTEGER,
+                    jev_latency_ms REAL,
+                    jev_cost_usd REAL,
+                    jev_confidence REAL,
+                    error_category TEXT
+                )
+                """
+            )
+
+        store = MetricsStore(path)
+        store.initialize()
+
+        with sqlite3.connect(path) as con:
+            turn_columns = {
+                row[1] for row in con.execute("PRAGMA table_info(hermes_turns)")
+            }
+            sample_columns = {
+                row[1] for row in con.execute("PRAGMA table_info(benchmark_samples)")
+            }
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+
+        self.assertEqual(version, "4")
+        for column in ("provider", "requested_model", "response_model", "api_mode"):
+            self.assertIn(column, turn_columns)
+        for column in (
+            "hermes_provider",
+            "hermes_requested_model",
+            "hermes_response_model",
+            "hermes_api_mode",
+        ):
+            self.assertIn(column, sample_columns)
+
+    def test_schema_v4_initialize_is_idempotent(self):
         store, path = self.make_store()
         store.initialize()
         store._initialized = False
@@ -332,7 +426,7 @@ class StoreTests(unittest.TestCase):
                 row[1]
                 for row in con.execute("PRAGMA index_list(hermes_turns)")
             }
-        self.assertEqual(version, "3")
+        self.assertEqual(version, "4")
         self.assertIn("idx_hermes_turns_benchmark_run", indexes)
 
     def test_newer_schema_fails_closed_for_store_only(self):
