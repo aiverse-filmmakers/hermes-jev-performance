@@ -53,16 +53,16 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** produce a valid conservative routing decision without modifying Hermes yet.
 
-- [ ] 3.1 Define family criteria for 10 families.
-- [ ] 3.2 Add `multi` criteria for mixed workflows.
-- [ ] 3.3 Add confidence threshold validation.
-- [ ] 3.4 Add family result parser.
-- [ ] 3.5 Add per-turn decision cache keyed by Hermes turn context.
-- [ ] 3.6 Add route validity checks.
-- [ ] 3.7 Add tool-family registry.
-- [ ] 3.8 Add unknown-tool and always-keep policy.
-- [ ] 3.9 Add deterministic unit fixtures for each family.
-- [ ] 3.10 Add ambiguous/mixed fixtures that must fall back safely.
+- [x] 3.1 Define family criteria for 10 families.
+- [x] 3.2 Add `multi` criteria for mixed workflows.
+- [x] 3.3 Add confidence threshold validation.
+- [x] 3.4 Add family result parser.
+- [x] 3.5 Add per-turn decision cache keyed by Hermes turn context.
+- [x] 3.6 Add route validity checks.
+- [x] 3.7 Add tool-family registry.
+- [x] 3.8 Add unknown-tool and always-keep policy.
+- [x] 3.9 Add deterministic unit fixtures for each family.
+- [x] 3.10 Add ambiguous/mixed fixtures that must fall back safely.
 
 **Gate P3:** classification suite passes and invalid/low-confidence/multi decisions never produce a hard filter.
 
@@ -70,16 +70,16 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** safely integrate routing into Hermes request flow.
 
-- [ ] 4.1 Register `llm_request` middleware through public API.
-- [ ] 4.2 Implement fresh-turn detection.
-- [ ] 4.3 OFF: zero Jev calls, unchanged tools.
-- [ ] 4.4 SHADOW: one Jev call, unchanged tools.
-- [ ] 4.5 ON: one Jev call, accepted tool filtering.
-- [ ] 4.6 Reuse decision across tool-loop provider calls.
-- [ ] 4.7 Fail open on every Jev/plugin exception.
-- [ ] 4.8 Preserve primary model/provider/auth settings.
-- [ ] 4.9 Add integration tests with synthetic Hermes requests/tool schemas.
-- [ ] 4.10 Add regression tests for mixed workflows.
+- [x] 4.1 Register `llm_request` middleware through public API.
+- [x] 4.2 Implement fresh-turn detection.
+- [x] 4.3 OFF: zero Jev calls, unchanged tools.
+- [x] 4.4 SHADOW: one Jev call, unchanged tools.
+- [x] 4.5 ON: one Jev call, accepted tool filtering.
+- [x] 4.6 Reuse decision across tool-loop provider calls.
+- [x] 4.7 Fail open on every Jev/plugin exception.
+- [x] 4.8 Preserve primary model/provider/auth settings.
+- [x] 4.9 Add integration tests with synthetic Hermes requests/tool schemas.
+- [x] 4.10 Add regression tests for mixed workflows.
 
 **Gate P4:** all three modes behave exactly as specified; simulated failures never break the Hermes request.
 

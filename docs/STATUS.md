@@ -1,6 +1,6 @@
 # Implementation Status
 
-**Current stage:** Phase 2 - OpenRouter Jev client implemented; live provider smoke gate pending.
+**Current stage:** Phases 3 and 4 - routing brain and Hermes middleware implemented; live Hermes/OpenRouter gates pending.
 
 ## Phase status
 
@@ -9,8 +9,8 @@
 | 0 | Foundation and provenance | In review | P0 |
 | 1 | Hermes plugin skeleton | Implementation complete (8/8); live gate pending | P1 |
 | 2 | OpenRouter Jev client | Implementation complete (10/10); live gate pending | P2 |
-| 3 | Tool-family router | Not started | P3 |
-| 4 | Off/Shadow/On middleware | Not started | P4 |
+| 3 | Tool-family router | Implementation complete (10/10); live semantic gate pending | P3 |
+| 4 | Off/Shadow/On middleware | Implementation complete (10/10); live Hermes gate pending | P4 |
 | 5 | Telegram/gateway and CLI controls | Not started | P5 |
 | 6 | Telemetry and metrics store | Not started | P6 |
 | 7 | Native Hermes dashboard | Not started | P7 |
@@ -34,11 +34,11 @@
 
 ## Current blockers
 
-The branch stack remains Phase 0 -> Phase 1 -> Phase 2. P1 still requires live Hermes Plugin Doctor/status validation. P2 still requires one explicit live `python -m jevperf.smoke` call against OpenRouter. Neither live gate is faked by CI.
+The branch stack remains Phase 0 -> Phase 1 -> Phase 2 -> Phases 3/4. P1 still requires live Hermes Plugin Doctor/status validation. P2 requires one explicit live OpenRouter smoke call. P3 requires live semantic routing checks using the routing fixture corpus. P4 requires a live Hermes middleware pass. None of these live gates are faked by CI.
 
 ## Next implementation action
 
-Complete the pending live P1/P2 gates on a supported Hermes/OpenRouter installation. After those gates pass, start **Phase 3.1**: define the 10-family routing criteria and deterministic routing fixtures.
+Complete the pending live P1-P4 gates on a supported Hermes/OpenRouter installation. In parallel, the next implementation phase is **Phase 5**: Telegram/gateway and CLI controls for `/jev on|off|shadow|status|notice|stats`.
 
 ## Status update rule
 

@@ -49,6 +49,8 @@ class PluginTests(unittest.TestCase):
             module.register(ctx)
 
         self.assertEqual(set(ctx.commands), {"jev"})
+        self.assertEqual(set(ctx.middleware), {"llm_request"})
+        self.assertEqual(len(ctx.middleware["llm_request"]), 1)
         command = ctx.commands["jev"]
         self.assertEqual(command["args_hint"], "[status|help]")
         self.assertIn("routing/performance", command["description"])
@@ -67,7 +69,8 @@ class PluginTests(unittest.TestCase):
             output = ctx.commands["jev"]["handler"]("status")
 
         self.assertEqual(ctx.settings, before)
-        self.assertIn("Routing: not active yet", output)
+        self.assertIn("Phase: 4 (routing middleware)", output)
+        self.assertIn("Last route: none yet", output)
 
 
 if __name__ == "__main__":

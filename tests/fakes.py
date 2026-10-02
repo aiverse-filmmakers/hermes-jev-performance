@@ -7,6 +7,7 @@ class FakeContext:
     def __init__(self, settings=None, *, middleware=True, set_config=True, state=True):
         self.settings = dict(settings or {})
         self.commands = {}
+        self.middleware = {}
         self._middleware_enabled = middleware
         self._set_config_enabled = set_config
         if state:
@@ -33,14 +34,14 @@ class FakeContext:
                 raise AttributeError(name)
         return object.__getattribute__(self, name)
 
-    def register_middleware(self, *args, **kwargs):
-        raise AssertionError("Phase 1 must not register middleware")
+    def register_middleware(self, kind, callback):
+        self.middleware.setdefault(kind, []).append(callback)
 
     def set_config(self, key, value):
         self.settings[key] = value
 
     def register_hook(self, *args, **kwargs):
-        raise AssertionError("Phase 1 must not register hooks")
+        raise AssertionError("unexpected hook registration")
 
     def register_cli_command(self, *args, **kwargs):
-        raise AssertionError("Phase 1 must not register CLI subcommands")
+        raise AssertionError("unexpected CLI subcommand registration")
