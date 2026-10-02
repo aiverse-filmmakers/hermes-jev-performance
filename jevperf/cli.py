@@ -9,6 +9,7 @@ from typing import Any
 from .benchmark_export import write_anonymized_export
 from .benchmark_runner import benchmark_plan_summary, run_live_benchmark
 from .commands import render_stats, render_status, set_mode, set_notice
+from .doctor import render_doctor, run_doctor
 
 
 def _fmt_delta(metric: dict[str, Any]) -> str:
