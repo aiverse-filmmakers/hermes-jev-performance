@@ -1,6 +1,5 @@
 import os
 import unittest
-from unittest import mock
 
 from scripts.live_release_gate import (
     GateResult,
@@ -8,6 +7,7 @@ from scripts.live_release_gate import (
     active_agent_smoke,
     active_profile_checks,
     isolated_lifecycle_checks,
+    live_jev_smoke,
     report_payload,
 )
 
@@ -15,14 +15,37 @@ from scripts.live_release_gate import (
 class FakeRunner:
     def __init__(self):
         self.calls = []
+        self.plugin_enabled = True
+        self.plugin_present = True
 
     def __call__(self, argv, *, env=None, timeout=180.0):
         self.calls.append((list(argv), dict(env or {}), timeout))
         command = " ".join(argv)
-        if command == "hermes jev status":
-            return Proc(0, "Hermes Jev Performance\nMode: shadow\n", "")
+
+        if argv[:3] == ["hermes", "plugins", "install"]:
+            self.plugin_present = True
+            self.plugin_enabled = "--enable" in argv
+            return Proc(0, "ok\n", "")
+        if command == "hermes plugins disable hermes-jev-performance":
+            self.plugin_enabled = False
+            return Proc(0, "ok\n", "")
+        if command == "hermes plugins enable hermes-jev-performance":
+            self.plugin_present = True
+            self.plugin_enabled = True
+            return Proc(0, "ok\n", "")
+        if command == "hermes plugins remove hermes-jev-performance":
+            self.plugin_present = False
+            self.plugin_enabled = False
+            return Proc(0, "ok\n", "")
         if command == "hermes plugins list":
-            return Proc(0, "security-guidance enabled\n", "")
+            text = "hermes-jev-performance enabled\n" if self.plugin_present else "security-guidance enabled\n"
+            return Proc(0, text, "")
+        if command == "hermes jev status":
+            if not self.plugin_enabled:
+                return Proc(2, "", "unknown command")
+            return Proc(0, "Hermes Jev Performance\nMode: shadow\n", "")
+        if argv[:2] == ["hermes", "jev"] and not self.plugin_enabled:
+            return Proc(2, "", "unknown command")
         return Proc(0, "ok\n", "")
 
 
@@ -79,6 +102,16 @@ class LiveReleaseGateTests(unittest.TestCase):
         self.assertIn("hermes jev off", commands)
         self.assertIn("hermes jev shadow", commands)
         self.assertIn("hermes jev on", commands)
+        by_name = {result.name: result for result in results}
+        self.assertEqual(by_name["disabled_registration_absent"].status, "pass")
+        self.assertEqual(by_name["post_enable_status"].status, "pass")
+        self.assertEqual(by_name["post_remove_absence"].status, "pass")
+
+    def test_live_jev_smoke_uses_profile_scoped_hermes_command(self):
+        runner = FakeRunner()
+        result = live_jev_smoke(runner=runner)
+        self.assertEqual(result.status, "pass")
+        self.assertEqual(runner.calls[-1][0], ["hermes", "jev", "smoke"])
 
     def test_active_agent_restores_original_mode(self):
         runner = FakeRunner()
