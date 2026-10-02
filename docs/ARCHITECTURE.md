@@ -350,7 +350,7 @@ benchmark runner
 benchmark-tagged Hermes telemetry
         |
         v
-SQLite schema v3
+SQLite schema v4
   - benchmark_runs
   - benchmark_samples
   - benchmark tags on hermes_turns
