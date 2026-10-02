@@ -66,9 +66,20 @@ FAMILY_CRITERIA: dict[str, str] = {
     ),
 }
 
+# Hermes' Tool Search bridge is intentionally always preserved. llm_request
+# middleware can filter the model-facing eager tool array, but current public
+# Hermes APIs do not provide a supported way to re-scope the bridge's underlying
+# deferred catalog after assembly. Removing the bridge can therefore hide a
+# deferred tool that belongs to the selected semantic family (for example an
+# installed GitHub plugin or deferred media tool). Jev routing is an optimization,
+# not an authorization boundary, so capability preservation wins.
 ALWAYS_KEEP = frozenset({
     "clarify",
     "delegate_task",
+    "hermes_tool_search",
+    "tool_search",
+    "tool_describe",
+    "tool_call",
 })
 
 FAMILY_EXACT: dict[str, frozenset[str]] = {
@@ -170,9 +181,10 @@ def _known_by_any_family(name: str) -> bool:
 def filter_tools(tools: Any, family: str) -> tuple[Any, bool, str]:
     """Filter known tools conservatively.
 
-    Unknown tools are preserved rather than accidentally removed. Known tools from
-    other families are removed. If the selected family has no usable tool in the
-    request, the original list is returned unchanged.
+    Unknown tools and Hermes' deferred-tool bridge are preserved rather than
+    accidentally removing capabilities. Known eager tools from other families
+    are removed. If the selected family has no usable eager tool in the request,
+    the original list is returned unchanged.
     """
     if family in UNRESTRICTED_FAMILIES:
         return tools, False, "unrestricted_family"
