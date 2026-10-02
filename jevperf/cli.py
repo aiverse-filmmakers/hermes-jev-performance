@@ -114,7 +114,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print(f"Measured repeats: {plan['repeats']}")
                 print(f"Total Hermes turns: {plan['total_turns']}")
                 print(f"Measured turns: {plan['measured_turns']}")
-                print(f"Network fixture: {'included' if plan['network_included'] else 'excluded'}")
+                print(f"Public-web workload fixture: {'included' if plan['public_web_fixture_included'] else 'excluded'}")
                 print("Order: paired alternating OFF/ON")
                 print("No benchmark was run. Add --live to execute paid/local Hermes turns.")
                 return 0
