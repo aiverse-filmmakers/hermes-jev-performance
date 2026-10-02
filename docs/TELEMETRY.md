@@ -40,7 +40,7 @@ Current observational decision table: `jev_decisions`.
 | input_tokens | integer nullable | provider-reported Jev input tokens |
 | output_tokens | integer nullable | provider-reported Jev output tokens |
 | accepted | boolean | route passed policy |
-| applied | boolean | tool policy actually changed request |
+| applied | boolean | eager tool policy actually changed request |
 | reason | text | applied/skipped/failure reason |
 | error_category | text nullable | normalized safe error |
 | error_status_code | integer nullable | safe HTTP status |
@@ -58,7 +58,7 @@ Current schema v4 table: `hermes_turns`.
 | completed_at | real nullable | completion time |
 | mode | text | effective mode for this process/turn |
 | route_family | text nullable | selected family |
-| route_applied | boolean | whether filtering applied |
+| route_applied | boolean | whether eager filtering applied |
 | route_reason | text nullable | filtered/shadow/mode_off/fallback reason |
 | duration_ms | real nullable | end-to-end observed turn duration |
 | llm_requests | integer | provider/LLM requests |
@@ -79,6 +79,8 @@ Current schema v4 table: `hermes_turns`.
 
 Benchmark tags contain identifiers only. They do not contain prompt text.
 
+Reduced current-Hermes session-end hooks that omit `turn_id` are handled through a bounded in-memory session-to-opaque-turn map. Raw session IDs from that fallback are never written to SQLite.
+
 ## 5. Mode changes
 
 `mode_changes` stores local metadata:
@@ -87,10 +89,10 @@ Benchmark tags contain identifiers only. They do not contain prompt text.
 timestamp
 old_mode
 new_mode
-source: slash | dashboard | cli | benchmark | config
+source: slash | dashboard | cli | config
 ```
 
-The Phase 8 live benchmark uses a process-scoped mode override and therefore does not need to mutate the user's persistent mode.
+The Phase 8 live benchmark uses a process-scoped mode override and therefore does not mutate the user's persistent mode.
 
 ## 6. Storage location and migrations
 
@@ -129,14 +131,21 @@ Controlled benchmark activity must never silently change ordinary usage charts.
 
 ### Jev operational metrics
 
-- mean/p50/p95/max latency where implemented;
+Implemented aggregate fields include:
+
+- average latency;
+- p50 latency;
+- p95 latency;
 - confidence;
-- provider-reported cost;
+- provider-reported average cost when available;
+- provider-reported total cost when available;
 - decisions by family;
 - accepted/applied percentage;
-- multi/low-confidence/error/fail-open rates.
+- multi/low-confidence/error/fail-open reasons through decision/turn metadata.
 
 These are operational metrics, not semantic-accuracy proof.
+
+Missing provider usage/cost metadata remains unavailable and does not invalidate an otherwise valid Jev decision.
 
 ### Hermes outcomes
 
@@ -158,7 +167,7 @@ Ordinary OFF, SHADOW and ON usage may be compared, but must be labelled observat
 
 ## 10. Controlled benchmark schema
 
-Schema v3 adds `benchmark_runs` and `benchmark_samples`. Schema v4 adds content-free Hermes runtime identity fields so benchmark samples can record the actual primary provider/requested model/response model/API mode observed from successful main-loop hooks.
+Schema v3 adds `benchmark_runs` and `benchmark_samples`. Schema v4 adds content-free Hermes runtime identity fields so the local benchmark database can record the actual primary provider/requested model/response model/API mode observed from successful main-loop hooks.
 
 ### benchmark_runs
 
@@ -190,6 +199,7 @@ Stores only metadata/results:
 - Hermes duration;
 - tool/LLM counts;
 - token fields;
+- local primary Hermes runtime identity fields;
 - route family/applied flag;
 - Jev latency/cost/confidence;
 - normalized error category.
@@ -209,8 +219,11 @@ Minimum methodology implemented in Phase 8:
 7. Alternate order between OFF→ON and ON→OFF on subsequent repeats.
 8. Require at least two measured repeats.
 9. Store benchmark records separately.
-10. Report absolute values and deltas.
-11. Do not automatically turn lower resource use into a quality verdict.
+10. Require ON samples to prove the expected route behavior before they count as matched evidence.
+11. Report absolute values and deltas.
+12. Do not automatically turn lower resource use into a quality verdict.
+
+A normal single-family ON fixture is valid only when the recorded family matches the fixture and filtering was applied. `none`/`multi` fixtures are valid only when the matching unrestricted route is recorded without a hard filter. Wrong-route or fail-open ON turns are tracked as invalid-routing samples and excluded from deltas.
 
 Full reproducibility instructions are in [BENCHMARK.md](BENCHMARK.md).
 
@@ -223,7 +236,7 @@ absolute_delta = ON mean - OFF mean
 percent_change = ((ON mean - OFF mean) / OFF mean) * 100
 ```
 
-Warm-ups and incomplete/unmatched pairs are excluded.
+Warm-ups, incomplete pairs, and routing-invalid ON samples are excluded.
 
 Negative duration/tool/token percentage means ON used less of that metric. It must not automatically be described as "better" without considering failures and result quality.
 
@@ -234,7 +247,7 @@ CI uses `benchmarks/fixtures/ci_synthetic.json`.
 It:
 
 - makes zero Hermes/provider/OpenRouter calls;
-- exercises the same pairing and delta engine;
+- exercises the same planning, routing-validity, pairing and delta engine;
 - provides deterministic OFF/ON values;
 - verifies warm-up exclusion and comparison math.
 
@@ -248,17 +261,22 @@ hermes jev benchmark --live
 
 Without `--live`, the CLI only prints the benchmark plan.
 
+Before any live turn, the runner validates telemetry availability, OpenRouter v1 provider/credential availability, timeout bounds, fixtures and plan construction.
+
 The live runner:
 
 - uses process-scoped OFF/ON overrides;
 - leaves the user's persistent Jev mode unchanged;
-- defaults to local/read-only workload fixtures while still using the configured model/Jev providers;
+- defaults to local/read-only workload fixtures while still using the configured Hermes model and Jev provider;
 - requires `--include-network` for the public-web fixture;
-- never performs app/email/GitHub mutation fixtures by default.
+- never performs app/email/GitHub mutation fixtures by default;
+- marks a run `complete_with_failures` when a measured sample is incomplete or an ON sample does not produce the expected routing behavior.
 
-## 15. Export
+## 15. Dashboard and export privacy
 
-An anonymized JSON export contains safe environment/methodology metadata, comparison results and content-free sample metrics.
+Authenticated dashboard benchmark history exposes reviewed low-cardinality environment/methodology fields and aggregate comparison results. It deliberately does not expose arbitrary local primary provider/model/API strings because custom values may contain private deployment identifiers or filesystem paths.
+
+An anonymized JSON export contains explicitly whitelisted safe environment/methodology metadata, comparison results and content-free sample metrics.
 
 It excludes:
 
@@ -268,7 +286,9 @@ It excludes:
 - raw Hermes turn IDs;
 - filesystem paths;
 - host/user identifiers;
-- undeclared environment values.
+- undeclared environment values;
+- undeclared methodology values;
+- arbitrary local primary provider/model/API-mode strings.
 
 ## 16. Cost
 
@@ -280,6 +300,8 @@ The live benchmark can also incur the user's normal Hermes primary-model/provide
 
 Default target: 30 days, configurable.
 
-Retention cleanup deletes old organic telemetry and benchmark records locally. It runs at most once per hour per active profile during normal collection.
+Retention cleanup deletes old organic telemetry and benchmark records locally. It preserves an old benchmark-run row while any retained newer sample still references that run, preventing orphaned benchmark samples.
+
+Cleanup runs at most once per hour per active profile during normal collection.
 
 Deleting metrics must never touch Hermes conversation history.
