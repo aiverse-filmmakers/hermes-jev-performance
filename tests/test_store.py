@@ -62,6 +62,9 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(stats.fallback, 0)
         self.assertEqual(stats.avg_confidence, 0.9)
         self.assertEqual(stats.avg_jev_latency_ms, 400)
+        self.assertEqual(stats.p50_jev_latency_ms, 400)
+        self.assertEqual(stats.p95_jev_latency_ms, 400)
+        self.assertAlmostEqual(stats.avg_jev_cost_usd, 0.00001)
         self.assertAlmostEqual(stats.total_jev_cost_usd, 0.00001)
         self.assertEqual(stats.avg_turn_duration_ms, 2000)
         self.assertEqual(stats.avg_tool_calls, 1)
@@ -79,6 +82,32 @@ class StoreTests(unittest.TestCase):
                 ("opaque-turn",),
             ).fetchone()
         self.assertEqual(turn, (300, 25, "complete", "filtered"))
+
+    def test_latency_percentiles_are_interpolated(self):
+        store, _ = self.make_store()
+        for index, latency in enumerate((100, 200, 300, 400, 500)):
+            key = f"turn-{index}"
+            store.touch_turn(key, "shadow", now=1000 + index)
+            store.record_decision(
+                turn_key=key,
+                mode="shadow",
+                decision=RoutingDecision(
+                    family="web",
+                    confidence=0.9,
+                    accepted=True,
+                    reason="accepted",
+                    latency_ms=latency,
+                    cost_usd=0.00001 * (index + 1),
+                ),
+                applied=False,
+                reason="shadow",
+                now=1000 + index + 0.1,
+            )
+        stats = store.summary(since_hours=1, now=1010)
+        self.assertEqual(stats.p50_jev_latency_ms, 300)
+        self.assertEqual(stats.p95_jev_latency_ms, 480)
+        self.assertAlmostEqual(stats.avg_jev_cost_usd, 0.00003)
+        self.assertAlmostEqual(stats.total_jev_cost_usd, 0.00015)
 
     def test_decision_is_unique_per_turn(self):
         store, _ = self.make_store()
