@@ -36,16 +36,16 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** isolated, tested Jev transport.
 
-- [ ] 2.1 Implement OpenRouter Decisions endpoint client.
-- [ ] 2.2 Implement configurable model ID.
-- [ ] 2.3 Implement dedicated credential lookup.
-- [ ] 2.4 Add optional generic OpenRouter credential compatibility path.
-- [ ] 2.5 Implement request timeout.
-- [ ] 2.6 Measure monotonic latency.
-- [ ] 2.7 Parse usage/cost safely.
-- [ ] 2.8 Normalize HTTP/provider/schema failures without leaking bodies/headers.
-- [ ] 2.9 Add mocked contract tests.
-- [ ] 2.10 Add optional explicit live smoke test command, never run implicitly in CI.
+- [x] 2.1 Implement OpenRouter Decisions endpoint client.
+- [x] 2.2 Implement configurable model ID.
+- [x] 2.3 Implement dedicated credential lookup.
+- [x] 2.4 Add optional generic OpenRouter credential compatibility path.
+- [x] 2.5 Implement request timeout.
+- [x] 2.6 Measure monotonic latency.
+- [x] 2.7 Parse usage/cost safely.
+- [x] 2.8 Normalize HTTP/provider/schema failures without leaking bodies/headers.
+- [x] 2.9 Add mocked contract tests.
+- [x] 2.10 Add optional explicit live smoke test command, never run implicitly in CI.
 
 **Gate P2:** mocked client tests pass; explicit smoke test can return route answers and usage through OpenRouter.
 
