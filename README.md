@@ -13,7 +13,7 @@ This project combines proven ideas from several MIT-licensed Jev/Hermes projects
 
 ## Project status
 
-**Active implementation. Phases 1-7 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
+**Active implementation. Phases 1-8 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
 
 The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_OF_TRUTH.md).
 
@@ -52,7 +52,17 @@ The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_
 /jev stats
 ```
 
-Equivalent CLI controls will be provided where Hermes' public plugin APIs support them.
+Equivalent CLI controls are provided where Hermes' public plugin APIs support them.
+
+Controlled benchmark CLI:
+
+```text
+hermes jev benchmark
+hermes jev benchmark --live
+hermes jev benchmark --live --export ./benchmark.json
+```
+
+The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default suite is read-only and network-free.
 
 ## Routing families
 
@@ -80,6 +90,7 @@ multi
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation roadmap](docs/ROADMAP.md)
 - [Telemetry and benchmarking](docs/TELEMETRY.md)
+- [Controlled benchmark](docs/BENCHMARK.md)
 - [Testing strategy](docs/TESTING.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Upstream projects and provenance](docs/UPSTREAMS.md)
