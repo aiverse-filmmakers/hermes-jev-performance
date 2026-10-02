@@ -86,14 +86,16 @@ def detect_compatibility(ctx: Any) -> dict[str, object]:
     telemetry_ready = all(telemetry.values())
     cli_ready = all(cli.values())
 
-    if not base_ready:
+    version = detect_hermes_version()
+    meets_floor = version_meets_floor(version)
+
+    if not base_ready or meets_floor is False:
         level = "unsupported"
     elif routing_ready and persistence_ready and telemetry_ready:
         level = "supported"
     else:
         level = "degraded"
 
-    version = detect_hermes_version()
     return {
         "level": level,
         "phase1_supported": base_ready,
@@ -103,7 +105,7 @@ def detect_compatibility(ctx: Any) -> dict[str, object]:
         "cli_controls_ready": cli_ready,
         "state_available": hasattr(ctx, "state"),
         "hermes_version": version,
-        "version_meets_floor": version_meets_floor(version),
+        "version_meets_floor": meets_floor,
         "minimum_hermes": MIN_HERMES_VERSION,
         "required": required,
         "future": {
