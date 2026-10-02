@@ -18,6 +18,7 @@ if str(PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(PLUGIN_ROOT))
 
 from jevperf.dashboard_service import (  # noqa: E402
+    analytics_payload,
     set_dashboard_mode,
     status_payload,
     summary_payload,
@@ -43,6 +44,17 @@ async def get_summary(
         return summary_payload(hours=hours)
     except Exception:
         raise HTTPException(status_code=503, detail="Jev telemetry unavailable")
+
+
+@router.get("/analytics")
+async def get_analytics(
+    hours: int = Query(default=24, ge=1, le=24 * 3650),
+    limit: int = Query(default=30, ge=1, le=200),
+) -> dict[str, Any]:
+    try:
+        return analytics_payload(hours=hours, limit=limit)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Jev analytics unavailable")
 
 
 @router.put("/mode")
