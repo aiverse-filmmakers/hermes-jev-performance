@@ -1,0 +1,156 @@
+# Install, Upgrade, Disable, Uninstall
+
+Hermes Jev Performance uses Hermes' native plugin lifecycle. It does not require a custom installer and does not patch Hermes core files.
+
+## Requirements
+
+- Hermes Agent **0.21.5 or newer**.
+- Python in the plugin's tested range: **3.11 through 3.14**.
+- OpenRouter access for SHADOW/ON routing.
+- Either:
+  - `OPENROUTER_JEV_API_TOKEN` (preferred dedicated Jev credential), or
+  - `OPENROUTER_API_KEY` (compatibility fallback).
+
+OFF mode works without an OpenRouter credential.
+
+## Recommended install
+
+From the public GitHub repository:
+
+```bash
+hermes plugins install aiverse-filmmakers/hermes-jev-performance --enable
+```
+
+Hermes owns the clone, install metadata, activation and dependency admission.
+
+For reproducible production installs, pin a full 40-character commit:
+
+```bash
+hermes plugins install aiverse-filmmakers/hermes-jev-performance --enable --ref <FULL_COMMIT_SHA>
+```
+
+A pinned plugin does not move during normal `hermes plugins update`. To move a pin, explicitly reinstall with `--force --ref <NEW_FULL_COMMIT_SHA>`.
+
+## First checks
+
+```bash
+hermes plugins doctor hermes-jev-performance --ci
+hermes jev status
+hermes jev doctor
+```
+
+The plugin defaults to SHADOW on first install.
+
+SHADOW calls Jev and records routing telemetry but does not change Hermes' tool list.
+
+## Enable / disable
+
+Enable:
+
+```bash
+hermes plugins enable hermes-jev-performance
+```
+
+Disable without deleting:
+
+```bash
+hermes plugins disable hermes-jev-performance
+```
+
+Disabling the plugin is the cleanest rollback. Hermes removes the plugin's runtime registrations through its own plugin lifecycle. No Hermes core rollback is required.
+
+## Routing mode vs plugin disable
+
+These are different controls:
+
+```text
+/jev off
+```
+
+keeps the plugin loaded but makes zero Jev routing calls. Local baseline telemetry may continue.
+
+```bash
+hermes plugins disable hermes-jev-performance
+```
+
+unloads/disables the plugin itself through Hermes.
+
+## Upgrade
+
+For an unpinned git install:
+
+```bash
+hermes plugins check-updates
+hermes plugins update hermes-jev-performance
+```
+
+Then validate:
+
+```bash
+hermes plugins doctor hermes-jev-performance --ci
+hermes jev doctor
+```
+
+Telemetry schema upgrades are forward migrations. Current schema is v3.
+
+## Roll back
+
+Preferred rollback:
+
+1. Disable the plugin.
+2. Install or re-pin the previously known-good full commit.
+3. Run Hermes plugin doctor.
+4. Re-enable only after validation.
+
+Example:
+
+```bash
+hermes plugins disable hermes-jev-performance
+hermes plugins install aiverse-filmmakers/hermes-jev-performance --force --ref <PREVIOUS_FULL_COMMIT_SHA>
+hermes plugins doctor hermes-jev-performance --ci
+hermes plugins enable hermes-jev-performance
+```
+
+Do not edit Hermes core files to roll this plugin back.
+
+## Telemetry database recovery
+
+If diagnostics report a corrupt local metrics database, routing still fails open independently of telemetry.
+
+Inspect first:
+
+```bash
+hermes jev doctor
+```
+
+An explicit repair option quarantines the corrupt metrics database and creates a clean schema:
+
+```bash
+hermes jev doctor --repair-db
+```
+
+Repair affects only this plugin's local telemetry database. It does not touch Hermes conversations, configuration, credentials or other plugin data.
+
+## Uninstall
+
+Remove the plugin through Hermes:
+
+```bash
+hermes plugins remove hermes-jev-performance
+```
+
+Hermes removes the installed plugin directory and its install metadata.
+
+Local metrics under the profile's plugin-data directory may be retained independently for safety/history depending on Hermes/profile lifecycle behavior. If a user wants those metrics removed too, they should inspect the profile-local plugin-data location first and delete it deliberately rather than using a repository-provided destructive script.
+
+## Verify normal Hermes operation after disable/uninstall
+
+Run a normal Hermes request and:
+
+```bash
+hermes plugins list
+```
+
+The plugin must not be enabled after disable, and must not be present after remove.
+
+No Hermes provider/model/auth rollback is needed because this project never replaces those paths.
