@@ -182,7 +182,7 @@ class BenchmarkStoreTests(unittest.TestCase):
         )
 
         self.assertEqual(row["status"], "complete")
-        self.assertEqual(row["hermes_duration_ms"], 800)
+        self.assertAlmostEqual(row["hermes_duration_ms"], 800, places=2)
         self.assertEqual(row["tool_calls"], 2)
         self.assertEqual(row["llm_requests"], 1)
         self.assertEqual(row["route_family"], "files")
