@@ -157,16 +157,16 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** make the plugin safe to distribute.
 
-- [ ] 9.1 Installer/update path.
-- [ ] 9.2 Disable/uninstall/rollback path.
-- [ ] 9.3 `doctor` diagnostics.
-- [ ] 9.4 Schema migration tests.
-- [ ] 9.5 Hermes compatibility matrix.
-- [ ] 9.6 Timeout/provider outage tests.
-- [ ] 9.7 Corrupt DB recovery/degraded mode.
-- [ ] 9.8 Third-party notice audit.
-- [ ] 9.9 Public-repo secret/private-data scan.
-- [ ] 9.10 Documentation install/upgrade/uninstall walkthrough.
+- [x] 9.1 Installer/update path.
+- [x] 9.2 Disable/uninstall/rollback path.
+- [x] 9.3 `doctor` diagnostics.
+- [x] 9.4 Schema migration tests.
+- [x] 9.5 Hermes compatibility matrix.
+- [x] 9.6 Timeout/provider outage tests.
+- [x] 9.7 Corrupt DB recovery/degraded mode.
+- [x] 9.8 Third-party notice audit.
+- [x] 9.9 Public-repo secret/private-data scan.
+- [x] 9.10 Documentation install/upgrade/uninstall walkthrough.
 
 **Gate P9:** clean install and clean uninstall are repeatable on supported Hermes versions.
 
