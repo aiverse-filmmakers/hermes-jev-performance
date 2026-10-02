@@ -349,6 +349,9 @@
             h("div", null, h("span", null, "Warmups"), h("strong", null, fmtInt(run.warmups))),
             h("div", null, h("span", null, "Failed samples"), h("strong", null, fmtInt(run.failed_samples))),
             h("div", null, h("span", null, "Hermes"), h("strong", null, env.hermes_version || "unavailable")),
+            h("div", null, h("span", null, "Primary provider"), h("strong", null, (run.hermes_providers || []).join(", ") || "unavailable")),
+            h("div", null, h("span", null, "Primary model"), h("strong", null, (run.hermes_models || []).join(", ") || "unavailable")),
+            h("div", null, h("span", null, "API mode"), h("strong", null, (run.hermes_api_modes || []).join(", ") || "unavailable")),
             h("div", null, h("span", null, "Plugin"), h("strong", null, env.plugin_version || "unavailable")),
             h("div", null, h("span", null, "Jev model"), h("strong", null, env.jev_model || "unavailable"))
           ),
