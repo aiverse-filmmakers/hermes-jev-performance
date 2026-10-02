@@ -52,6 +52,7 @@ class StoreTests(unittest.TestCase):
                 "output_tokens_details": {"reasoning_tokens": 25},
             },
         )
+        store.record_turn_reason("opaque-turn", "filtered")
         store.finish_turn("opaque-turn", status="complete", now=1002)
 
         stats = store.summary(since_hours=1, now=1003)
@@ -72,12 +73,12 @@ class StoreTests(unittest.TestCase):
         with sqlite3.connect(path) as con:
             turn = con.execute(
                 """
-                SELECT cached_input_tokens, reasoning_tokens, status
+                SELECT cached_input_tokens, reasoning_tokens, status, route_reason
                 FROM hermes_turns WHERE turn_key = ?
                 """,
                 ("opaque-turn",),
             ).fetchone()
-        self.assertEqual(turn, (300, 25, "complete"))
+        self.assertEqual(turn, (300, 25, "complete", "filtered"))
 
     def test_decision_is_unique_per_turn(self):
         store, _ = self.make_store()
