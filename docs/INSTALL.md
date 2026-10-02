@@ -41,7 +41,7 @@ hermes jev doctor
 
 The plugin defaults to SHADOW on first install.
 
-SHADOW calls Jev and records routing telemetry but does not change Hermes' tool list.
+SHADOW calls Jev and records routing telemetry but does not change Hermes' eager tool list.
 
 ## Enable / disable
 
@@ -123,20 +123,25 @@ Inspect first:
 hermes jev doctor
 ```
 
-An explicit repair option quarantines the corrupt metrics database and creates a clean schema:
+Before repairing, stop any other Hermes gateway, dashboard, agent, or automation process that uses the same profile. Repair renames the SQLite database and its WAL/SHM companions, so it must not race another writer.
+
+Then run a one-off CLI repair:
 
 ```bash
 hermes jev doctor --repair-db
+hermes jev doctor
 ```
 
-Repair affects only this plugin's local telemetry database. It does not touch Hermes conversations, configuration, credentials or other plugin data.
+After doctor reports a healthy schema, restart the normal Hermes services for that profile.
+
+Repair affects only this plugin's local telemetry database. It does not touch Hermes conversations, configuration, credentials or other plugin data. Repair is never automatic.
 
 ## Uninstall
 
 Remove the plugin through Hermes:
 
 ```bash
-hermes plugins remove hermes-jev-performance
+heres plugins remove hermes-jev-performance
 ```
 
 Hermes removes the installed plugin directory and its install metadata.
