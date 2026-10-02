@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from jevperf.benchmark_context import read_benchmark_context
+from jevperf.benchmark_context import read_benchmark_context, read_benchmark_mode
 from jevperf.benchmark_runner import run_live_benchmark
 from jevperf.routing import RoutingDecision
 from jevperf.store import StoreProvider
@@ -71,7 +71,9 @@ class BenchmarkRunnerTests(unittest.TestCase):
 
             context = read_benchmark_context(kwargs["env"])
             self.assertIsNotNone(context)
-            mode = ctx.settings["mode"]
+            self.assertEqual(ctx.settings["mode"], "shadow")
+            mode = read_benchmark_mode(kwargs["env"])
+            self.assertIn(mode, {"off", "on"})
             turn_key = "turn-" + context.sample_id
             now = time.time()
             store.touch_turn(turn_key, mode, benchmark=context, now=now)
@@ -130,9 +132,7 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertEqual(report["comparison"]["matched_pairs"], 2)
         duration = report["comparison"]["metrics"]["hermes_duration_ms"]
         self.assertLess(duration["on_mean"], duration["off_mean"])
-        self.assertTrue(
-            any(change[2] == "benchmark" for change in telemetry.mode_changes)
-        )
+        self.assertEqual(telemetry.mode_changes, [])
 
     def test_timeout_records_failure_and_restores_original_mode(self):
         ctx, telemetry = self.make_runtime()
