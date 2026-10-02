@@ -78,6 +78,13 @@ class BenchmarkRunnerTests(unittest.TestCase):
             now = time.time()
             store.touch_turn(turn_key, mode, benchmark=context, now=now)
             store.increment_llm_request(turn_key)
+            store.record_runtime_identity(
+                turn_key,
+                provider="synthetic-provider",
+                requested_model="synthetic-model",
+                response_model="synthetic-model-v1",
+                api_mode="synthetic-api",
+            )
             if mode == "off":
                 store.increment_llm_request(turn_key)
                 store.increment_tool_call(turn_key)
@@ -132,6 +139,10 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertEqual(report["comparison"]["matched_pairs"], 2)
         duration = report["comparison"]["metrics"]["hermes_duration_ms"]
         self.assertLess(duration["on_mean"], duration["off_mean"])
+        measured = [sample for sample in report["samples"] if not sample["is_warmup"]]
+        self.assertTrue(all(sample["hermes_provider"] == "synthetic-provider" for sample in measured))
+        self.assertTrue(all(sample["hermes_response_model"] == "synthetic-model-v1" for sample in measured))
+        self.assertTrue(all(sample["hermes_api_mode"] == "synthetic-api" for sample in measured))
         self.assertEqual(telemetry.mode_changes, [])
 
     def test_timeout_records_failure_and_restores_original_mode(self):
