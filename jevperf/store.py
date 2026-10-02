@@ -614,7 +614,17 @@ class MetricsStore:
         cutoff = float(now if now is not None else time.time()) - (days * 86400)
         with self._connection() as con:
             con.execute("DELETE FROM benchmark_samples WHERE started_at < ?", (cutoff,))
-            con.execute("DELETE FROM benchmark_runs WHERE created_at < ?", (cutoff,))
+            con.execute(
+                """
+                DELETE FROM benchmark_runs
+                WHERE created_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM benchmark_samples
+                      WHERE benchmark_samples.run_id = benchmark_runs.run_id
+                  )
+                """,
+                (cutoff,),
+            )
             con.execute("DELETE FROM jev_decisions WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM hermes_turns WHERE started_at < ?", (cutoff,))
             con.execute("DELETE FROM mode_changes WHERE created_at < ?", (cutoff,))
