@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from . import __version__
+from .benchmark import calculate_comparison
+from .benchmark_export import build_anonymized_export
 from .config import VALID_MODES, ConfigSnapshot, read_config
 from .store import MetricsStore, SCHEMA_VERSION, StatsSummary, default_db_path
 
@@ -228,3 +230,75 @@ def analytics_payload(
             limit=bounded_limit,
         ),
     }
+
+
+def benchmark_runs_payload(
+    *,
+    limit: int = 10,
+    store: MetricsStore | None = None,
+) -> dict[str, Any]:
+    row_limit = max(1, min(int(limit), 50))
+    db_path = default_db_path() if store is None else store.path
+    if store is None and not db_path.exists():
+        return {"database_state": "empty", "runs": []}
+
+    active = store or MetricsStore(db_path)
+    runs = []
+    for run in active.list_benchmark_runs(limit=row_limit):
+        samples = active.benchmark_samples(
+            run["run_id"],
+            include_warmups=True,
+        )
+        environment = run.get("environment")
+        safe_environment = {
+            key: environment.get(key)
+            for key in (
+                "benchmark_version",
+                "plugin_version",
+                "hermes_version",
+                "python_version",
+                "os_family",
+                "architecture",
+                "provider",
+                "jev_model",
+                "fixture_set_sha256",
+                "repeats",
+                "warmups",
+                "order_policy",
+                "python_implementation",
+            )
+            if isinstance(environment, dict) and key in environment
+        }
+        measured = [sample for sample in samples if not sample.get("is_warmup")]
+        failed = [sample for sample in measured if sample.get("status") != "complete"]
+        runs.append(
+            {
+                "run_id": run["run_id"],
+                "created_at": run["created_at"],
+                "completed_at": run["completed_at"],
+                "status": run["status"],
+                "benchmark_version": run["benchmark_version"],
+                "fixture_set_hash": run["fixture_set_hash"],
+                "fixture_count": run["fixture_count"],
+                "repeats": run["repeats"],
+                "warmups": run["warmups"],
+                "environment": safe_environment,
+                "methodology": run.get("methodology", {}),
+                "measured_samples": len(measured),
+                "failed_samples": len(failed),
+                "comparison": calculate_comparison(samples),
+            }
+        )
+    return {"database_state": "ready", "runs": runs}
+
+
+def benchmark_export_payload(
+    run_id: str,
+    *,
+    store: MetricsStore | None = None,
+) -> dict[str, Any]:
+    db_path = default_db_path() if store is None else store.path
+    if store is None and not db_path.exists():
+        raise KeyError("benchmark run not found")
+    active = store or MetricsStore(db_path)
+    return build_anonymized_export(active, run_id)

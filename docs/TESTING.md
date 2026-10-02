@@ -71,6 +71,22 @@ Use synthetic request/tool schemas to verify:
 - malformed command;
 - state persists across plugin reload.
 
+### Controlled benchmark tests
+
+- deterministic synthetic OFF/ON fixtures with zero network calls;
+- read-only local fixture validation;
+- warm-up exclusion;
+- paired alternating order;
+- paired delta/percent math;
+- incomplete half-pairs excluded;
+- process-scoped benchmark mode override;
+- user's persistent Jev mode remains unchanged;
+- benchmark rows excluded from organic analytics;
+- safe environment metadata only;
+- anonymized export contains no sample IDs, paths, prompts or host identifiers;
+- mocked live runner success and timeout/failure behavior;
+- CLI preview performs zero live benchmark turns.
+
 ## 3. Routing fixture suite
 
 At minimum include clear examples for:

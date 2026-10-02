@@ -19,6 +19,8 @@ if str(PLUGIN_ROOT) not in sys.path:
 
 from jevperf.dashboard_service import (  # noqa: E402
     analytics_payload,
+    benchmark_export_payload,
+    benchmark_runs_payload,
     set_dashboard_mode,
     status_payload,
     summary_payload,
@@ -55,6 +57,26 @@ async def get_analytics(
         return analytics_payload(hours=hours, limit=limit)
     except Exception:
         raise HTTPException(status_code=503, detail="Jev analytics unavailable")
+
+
+@router.get("/benchmarks")
+async def get_benchmarks(
+    limit: int = Query(default=10, ge=1, le=50),
+) -> dict[str, Any]:
+    try:
+        return benchmark_runs_payload(limit=limit)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Jev benchmark data unavailable")
+
+
+@router.get("/benchmarks/{run_id}/export")
+async def get_benchmark_export(run_id: str) -> dict[str, Any]:
+    try:
+        return benchmark_export_payload(run_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Benchmark run not found")
+    except Exception:
+        raise HTTPException(status_code=503, detail="Benchmark export unavailable")
 
 
 @router.put("/mode")

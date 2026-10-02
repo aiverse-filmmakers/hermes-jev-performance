@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .benchmark_context import read_benchmark_mode
+
 
 VALID_MODES = frozenset({"off", "shadow", "on"})
 
@@ -90,6 +92,10 @@ def read_config(ctx: Any) -> ConfigSnapshot:
     if mode not in VALID_MODES:
         warnings.append("invalid_mode_fallback")
         mode = DEFAULT_MODE
+
+    benchmark_mode = read_benchmark_mode()
+    if benchmark_mode is not None:
+        mode = benchmark_mode
 
     provider = _clean_string(_get(ctx, "provider", DEFAULT_PROVIDER), DEFAULT_PROVIDER).lower()
     model = _clean_string(_get(ctx, "model", DEFAULT_MODEL), DEFAULT_MODEL)

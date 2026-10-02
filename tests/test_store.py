@@ -144,7 +144,7 @@ class StoreTests(unittest.TestCase):
                 }
                 self.assertTrue(forbidden.isdisjoint(columns))
 
-    def test_v1_database_migrates_to_v2(self):
+    def test_v1_database_migrates_through_v3(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         path = Path(temp.name) / "metrics.sqlite3"
@@ -187,7 +187,7 @@ class StoreTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertIn("route_reason", columns)
-        self.assertEqual(version, "2")
+        self.assertEqual(version, "3")
 
     def test_newer_schema_fails_closed_for_store_only(self):
         temp = tempfile.TemporaryDirectory()

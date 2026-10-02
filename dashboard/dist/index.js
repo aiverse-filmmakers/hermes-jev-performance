@@ -43,6 +43,11 @@
     return num === null ? "0" : Math.round(num).toLocaleString();
   }
 
+  function fmtSignedPct(value) {
+    const num = n(value);
+    return num === null ? "No data" : (num >= 0 ? "+" : "") + num.toFixed(1) + "%";
+  }
+
   function fmtFloat(value, digits) {
     const num = n(value);
     return num === null ? "No data" : num.toFixed(digits == null ? 2 : digits);
@@ -276,6 +281,114 @@
     );
   }
 
+  function benchmarkMetricValue(name, value) {
+    if (value == null) return "No data";
+    if (name === "hermes_duration_ms") return fmtMs(value);
+    return fmtFloat(value, 2);
+  }
+
+  function ControlledBenchmark(props) {
+    const runs = Array.isArray(props.runs) ? props.runs : [];
+    if (!runs.length) {
+      return h(C.Card, { className: "jv-panel-card" },
+        h(C.CardContent, { className: "jv-benchmark-empty" },
+          h("strong", null, "No controlled benchmark yet"),
+          h("p", null,
+            "Run ",
+            h("code", null, "hermes jev benchmark"),
+            " to preview the read-only suite, then add ",
+            h("code", null, "--live"),
+            " when you explicitly want to execute it."
+          )
+        )
+      );
+    }
+
+    const run = runs[0];
+    const comparison = run.comparison || {};
+    const metrics = comparison.metrics || {};
+    const rows = [
+      ["hermes_duration_ms", "Hermes duration"],
+      ["tool_calls", "Tool calls"],
+      ["llm_requests", "LLM requests"],
+      ["total_tokens", "Total tokens"],
+      ["input_tokens", "Input tokens"],
+      ["output_tokens", "Output tokens"]
+    ];
+    const env = run.environment || {};
+
+    return h("div", { className: "jv-benchmark-wrap" },
+      h(C.Card, { className: "jv-panel-card jv-benchmark-summary" },
+        h(C.CardHeader, { className: "jv-card-header" },
+          h("div", null,
+            h(C.CardTitle, { className: "jv-card-title" }, "Latest controlled run"),
+            h("p", { className: "jv-card-subtitle" },
+              "Matched fixture + repeat pairs. Warm-ups are excluded from deltas."
+            )
+          ),
+          h("div", { className: "jv-status-badges" },
+            h("span", { className: "jv-badge jv-badge-ready" }, "CONTROLLED"),
+            h("span", { className: badgeClass(run.status === "complete" ? "ready" : "shadow") },
+              String(run.status || "unknown").toUpperCase()
+            )
+          )
+        ),
+        h(C.CardContent, null,
+          h("div", { className: "jv-benchmark-meta" },
+            h("div", null, h("span", null, "Matched pairs"), h("strong", null, fmtInt(comparison.matched_pairs))),
+            h("div", null, h("span", null, "Fixtures"), h("strong", null, fmtInt(run.fixture_count))),
+            h("div", null, h("span", null, "Repeats"), h("strong", null, fmtInt(run.repeats))),
+            h("div", null, h("span", null, "Warmups"), h("strong", null, fmtInt(run.warmups))),
+            h("div", null, h("span", null, "Failed samples"), h("strong", null, fmtInt(run.failed_samples))),
+            h("div", null, h("span", null, "Hermes"), h("strong", null, env.hermes_version || "unavailable")),
+            h("div", null, h("span", null, "Plugin"), h("strong", null, env.plugin_version || "unavailable")),
+            h("div", null, h("span", null, "Jev model"), h("strong", null, env.jev_model || "unavailable"))
+          ),
+          h("div", { className: "jv-benchmark-actions" },
+            h("button", {
+              className: "jv-secondary-button",
+              type: "button",
+              onClick: function () { props.onExport(run.run_id); }
+            }, "Export anonymized JSON")
+          )
+        )
+      ),
+      h("div", { className: "jv-table-wrap" },
+        h("table", { className: "jv-table jv-benchmark-table" },
+          h("thead", null,
+            h("tr", null,
+              h("th", null, "Metric"),
+              h("th", null, "Pairs"),
+              h("th", null, "OFF mean"),
+              h("th", null, "ON mean"),
+              h("th", null, "Absolute Δ"),
+              h("th", null, "% change")
+            )
+          ),
+          h("tbody", null,
+            rows.map(function (entry) {
+              const name = entry[0];
+              const label = entry[1];
+              const metric = metrics[name] || {};
+              return h("tr", { key: name },
+                h("td", null, label),
+                h("td", null, fmtInt(metric.pairs)),
+                h("td", null, benchmarkMetricValue(name, metric.off_mean)),
+                h("td", null, benchmarkMetricValue(name, metric.on_mean)),
+                h("td", null, benchmarkMetricValue(name, metric.absolute_delta)),
+                h("td", null, fmtSignedPct(metric.percent_change))
+              );
+            })
+          )
+        )
+      ),
+      h("p", { className: "jv-section-copy" },
+        "Negative change means ON used less time/resources for that metric; positive means more. ",
+        "This table reports measured deltas only and does not score result quality."
+      )
+    );
+  }
+
   function RecentDecisions(props) {
     const rows = Array.isArray(props.rows) ? props.rows : [];
     if (!rows.length) return h("div", { className: "jv-empty" }, "No Jev decisions in this period.");
@@ -318,6 +431,9 @@
     const analyticsPair = hooks.useState(null);
     const analytics = analyticsPair[0];
     const setAnalytics = analyticsPair[1];
+    const benchmarkPair = hooks.useState(null);
+    const benchmarks = benchmarkPair[0];
+    const setBenchmarks = benchmarkPair[1];
     const hoursPair = hooks.useState(24);
     const hours = hoursPair[0];
     const setHours = hoursPair[1];
@@ -338,11 +454,13 @@
       if (!quiet) setLoading(true);
       return Promise.all([
         SDK.fetchJSON(API + "/status"),
-        SDK.fetchJSON(API + "/analytics?hours=" + hours + "&limit=30")
+        SDK.fetchJSON(API + "/analytics?hours=" + hours + "&limit=30"),
+        SDK.fetchJSON(API + "/benchmarks?limit=10")
       ])
         .then(function (payloads) {
           setData(payloads[0]);
           setAnalytics(payloads[1]);
+          setBenchmarks(payloads[2]);
           setError(null);
         })
         .catch(function (err) {
@@ -358,6 +476,25 @@
       const id = window.setInterval(function () { load(true); }, 15000);
       return function () { window.clearInterval(id); };
     }, [load]);
+
+    function exportBenchmark(runId) {
+      SDK.fetchJSON(API + "/benchmarks/" + encodeURIComponent(runId) + "/export")
+        .then(function (payload) {
+          const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "hermes-jev-benchmark-" + runId + ".json";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          setFeedback("Anonymized benchmark JSON exported.");
+        })
+        .catch(function (err) {
+          setError(String(err && err.message ? err.message : err));
+        });
+    }
 
     function changeMode(mode) {
       if (!data || mode === data.mode || busy) return;
@@ -421,7 +558,7 @@
           h("h1", null, "Jev Performance"),
           h("p", null,
             "See what Jev is deciding, how long it takes, and how Hermes behaves around it. ",
-            "Mode comparisons are observational until a controlled benchmark is run."
+            "Organic mode comparisons stay observational; controlled matched runs are shown separately below."
           )
         ),
         h("div", { className: "jv-hero-actions" },
@@ -545,6 +682,24 @@
       h("section", { className: "jv-section" },
         h("div", { className: "jv-section-head" },
           h("div", null,
+            h("div", { className: "jv-section-label" }, "Controlled benchmark"),
+            h("h2", null, "Matched OFF vs ON")
+          ),
+          h("span", { className: "jv-controlled-label" }, "MATCHED WORKLOADS")
+        ),
+        h("p", { className: "jv-section-copy" },
+          "These results come only from explicit benchmark runs using the same fixture/repeat pairs under OFF and ON. ",
+          "Warm-ups are excluded from the comparison."
+        ),
+        h(ControlledBenchmark, {
+          runs: benchmarks && benchmarks.runs ? benchmarks.runs : [],
+          onExport: exportBenchmark
+        })
+      ),
+
+      h("section", { className: "jv-section" },
+        h("div", { className: "jv-section-head" },
+          h("div", null,
             h("div", { className: "jv-section-label" }, "Mode comparison"),
             h("h2", null, "OFF vs SHADOW vs ON")
           ),
@@ -570,8 +725,8 @@
       h("section", { className: "jv-footnote" },
         h("strong", null, "What this proves today"),
         h("p", null,
-          "The dashboard reports real local telemetry and observational mode differences. ",
-          "It does not claim Jev made Hermes faster. Phase 8 will run matched OFF vs ON workloads for causal benchmarking."
+          "Organic mode data remains observational. Controlled benchmark rows use matched OFF/ON fixture pairs, ",
+          "but the dashboard reports deltas rather than turning them into a quality or capability verdict."
         )
       )
     );

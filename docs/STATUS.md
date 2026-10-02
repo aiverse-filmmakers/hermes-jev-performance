@@ -1,6 +1,6 @@
 # Implementation Status
 
-**Current stage:** Phase 7 - native Hermes performance dashboard implemented; live Hermes/OpenRouter/dashboard integration gates pending.
+**Current stage:** Phase 8 - controlled matched OFF-vs-ON benchmark implemented; live Hermes/OpenRouter/dashboard integration gates remain pending.
 
 ## Phase status
 
@@ -14,7 +14,7 @@
 | 5 | Telegram/gateway and CLI controls | Implementation complete (10/10); live gateway gate pending | P5 |
 | 6 | Telemetry and metrics store | Implementation complete (11/11); code gate passed | P6 |
 | 7 | Native Hermes dashboard | Implementation complete (13/13); live dashboard gate pending | P7 |
-| 8 | Controlled A/B benchmark | Not started | P8 |
+| 8 | Controlled A/B benchmark | Implementation complete (8/8); synthetic/reproducibility gate passed | P8 |
 | 9 | Hardening/packaging/migration | Not started | P9 |
 | 10 | Public beta | Not started | P10 |
 
@@ -34,11 +34,11 @@
 
 ## Current blockers
 
-The branch stack remains Phase 0 -> Phase 1 -> Phase 2 -> Phases 3/4 -> Phases 5/6 -> Phase 7. P1 still requires live Hermes Plugin Doctor/status validation. P2 requires one explicit live OpenRouter smoke call. P3 requires live semantic routing checks. P4 requires a live Hermes middleware pass. P5 requires a real gateway/Telegram toggle and restart-persistence check. P6 telemetry hooks will be verified during that live pass. P7 requires native dashboard discovery/API mount, authenticated UI load, and mode-toggle read-back on a real Hermes dashboard. None of these live gates are faked by CI.
+The branch stack remains Phase 0 -> Phase 1 -> Phase 2 -> Phases 3/4 -> Phases 5/6 -> Phase 7 -> Phase 8. P1 still requires live Hermes Plugin Doctor/status validation. P2 requires one explicit live OpenRouter smoke call. P3 requires live semantic routing checks. P4 requires a live Hermes middleware pass. P5 requires a real gateway/Telegram toggle and restart-persistence check. P6 telemetry hooks will be verified during that live pass. P7 requires native dashboard discovery/API mount, authenticated UI load, and mode-toggle read-back on a real Hermes dashboard. P8 has a deterministic zero-network CI benchmark plus an explicit local read-only live harness; no real provider benchmark result is claimed or published until that harness is deliberately run. None of the live gates are faked by CI.
 
 ## Next implementation action
 
-Complete the pending live P1-P7 integration gates on a supported Hermes/OpenRouter installation. In parallel, the next implementation phase is **Phase 8**: run a controlled matched OFF vs ON benchmark so the dashboard can distinguish causal benchmark results from ordinary observational usage.
+Complete the pending live P1-P7 integration gates on a supported Hermes/OpenRouter installation. A Phase 8 live benchmark may then be run explicitly when provider usage is acceptable. The next implementation phase is **Phase 9**: hardening, packaging, migrations, doctor diagnostics and clean install/uninstall.
 
 ## Status update rule
 

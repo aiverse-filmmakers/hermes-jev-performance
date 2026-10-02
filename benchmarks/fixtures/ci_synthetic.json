@@ -1,0 +1,87 @@
+{
+  "suite_version": 1,
+  "description": "Synthetic deterministic fixtures for CI. Never invokes Hermes or paid APIs.",
+  "fixtures": [
+    {
+      "id": "ci-terminal",
+      "family": "terminal",
+      "prompt": "Synthetic terminal benchmark fixture.",
+      "read_only": true,
+      "requires_network": false,
+      "mock": {
+        "off": {
+          "hermes_duration_ms": 1000,
+          "tool_calls": 3,
+          "llm_requests": 2,
+          "input_tokens": 1200,
+          "cached_input_tokens": 100,
+          "output_tokens": 120,
+          "reasoning_tokens": 20
+        },
+        "on": {
+          "hermes_duration_ms": 800,
+          "tool_calls": 2,
+          "llm_requests": 1,
+          "input_tokens": 900,
+          "cached_input_tokens": 150,
+          "output_tokens": 100,
+          "reasoning_tokens": 15
+        }
+      }
+    },
+    {
+      "id": "ci-files",
+      "family": "files",
+      "prompt": "Synthetic files benchmark fixture.",
+      "read_only": true,
+      "requires_network": false,
+      "mock": {
+        "off": {
+          "hermes_duration_ms": 1200,
+          "tool_calls": 4,
+          "llm_requests": 2,
+          "input_tokens": 1500,
+          "cached_input_tokens": 200,
+          "output_tokens": 130,
+          "reasoning_tokens": 25
+        },
+        "on": {
+          "hermes_duration_ms": 900,
+          "tool_calls": 2,
+          "llm_requests": 1,
+          "input_tokens": 1000,
+          "cached_input_tokens": 250,
+          "output_tokens": 110,
+          "reasoning_tokens": 18
+        }
+      }
+    },
+    {
+      "id": "ci-none",
+      "family": "none",
+      "prompt": "Synthetic no-tool benchmark fixture.",
+      "read_only": true,
+      "requires_network": false,
+      "mock": {
+        "off": {
+          "hermes_duration_ms": 500,
+          "tool_calls": 0,
+          "llm_requests": 1,
+          "input_tokens": 500,
+          "cached_input_tokens": 0,
+          "output_tokens": 80,
+          "reasoning_tokens": 10
+        },
+        "on": {
+          "hermes_duration_ms": 520,
+          "tool_calls": 0,
+          "llm_requests": 1,
+          "input_tokens": 500,
+          "cached_input_tokens": 0,
+          "output_tokens": 80,
+          "reasoning_tokens": 10
+        }
+      }
+    }
+  ]
+}

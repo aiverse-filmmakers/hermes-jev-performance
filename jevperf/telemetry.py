@@ -7,6 +7,7 @@ import threading
 import time
 from typing import Any
 
+from .benchmark_context import read_benchmark_context
 from .config import read_config
 from .store import StoreProvider
 from .turns import turn_key
@@ -30,7 +31,7 @@ class TelemetryObserver:
         self._last_cleanup: dict[str, float] = {}
         self._cleanup_lock = threading.Lock()
 
-    def _touch_once(self, store: Any, key: str, mode: str) -> None:
+    def _touch_once(self, store: Any, key: str, mode: str, benchmark: Any = None) -> None:
         identity = (str(getattr(store, "path", "")), key)
         with self._seen_lock:
             if identity in self._seen_turns:
@@ -40,7 +41,7 @@ class TelemetryObserver:
             self._seen_turns.move_to_end(identity)
             while len(self._seen_turns) > 2048:
                 self._seen_turns.popitem(last=False)
-        _safe_call(store.touch_turn, key, mode)
+        _safe_call(store.touch_turn, key, mode, benchmark=benchmark)
 
     def _cleanup_if_due(self, store: Any, retention_days: int) -> None:
         identity = str(getattr(store, "path", ""))
@@ -60,7 +61,8 @@ class TelemetryObserver:
         if not config.telemetry_enabled:
             return key
         store = self.stores.get()
-        self._touch_once(store, key, mode or config.mode)
+        benchmark = read_benchmark_context()
+        self._touch_once(store, key, mode or config.mode, benchmark)
         self._cleanup_if_due(store, config.retention_days)
         return key
 

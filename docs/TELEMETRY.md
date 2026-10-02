@@ -4,7 +4,7 @@
 
 The dashboard must separate **Jev decision performance** from **Hermes end-to-end performance**.
 
-A 300 ms Jev decision does not prove the Hermes turn became faster. Conversely, a slower individual turn does not prove Jev is harmful without a matched workload and enough samples.
+A fast Jev decision does not prove the complete Hermes turn became faster. Ordinary ON/OFF usage also does not prove causality because the requests differ. Controlled matched benchmark data is therefore stored and rendered separately.
 
 ## 2. Content policy
 
@@ -17,20 +17,22 @@ Persist metadata only. Do not persist:
 - memory content;
 - API keys or headers;
 - raw provider error bodies;
-- private URLs.
+- private URLs;
+- raw Hermes session or turn IDs.
 
 ## 3. Decision record
 
-Current schema v2 table: `jev_decisions`.
+Current observational decision table: `jev_decisions`.
 
 | Field | Type | Meaning |
 |---|---|---|
 | id | integer | local row id |
 | turn_key | text | opaque local correlation key |
-| created_at | datetime | decision time |
-| mode | text | off/shadow/on |
-| provider | text | e.g. openrouter |
-| requested_model | text nullable | requested Jev model identifier |\n| actual_model | text nullable | provider-returned Jev model identifier |
+| created_at | real | decision time |
+| mode | text | shadow/on for Jev decisions |
+| provider | text nullable | e.g. openrouter |
+| requested_model | text nullable | requested Jev model |
+| actual_model | text nullable | provider-returned Jev model |
 | family | text nullable | chosen route |
 | confidence | real nullable | provider-returned confidence |
 | latency_ms | real nullable | measured Jev request wall time |
@@ -39,129 +41,241 @@ Current schema v2 table: `jev_decisions`.
 | output_tokens | integer nullable | provider-reported Jev output tokens |
 | accepted | boolean | route passed policy |
 | applied | boolean | tool policy actually changed request |
-| reason | text | applied/skipped/failure reason code |
-| error_category | text nullable | normalized safe error category |\n| error_status_code | integer nullable | safe HTTP status when available |
+| reason | text | applied/skipped/failure reason |
+| error_category | text nullable | normalized safe error |
+| error_status_code | integer nullable | safe HTTP status |
 
 No state/prompt column exists.
 
-## 4. Turn record
+## 4. Hermes turn record
 
-Current schema v2 table: `hermes_turns`.
+Current schema v3 table: `hermes_turns`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| id | integer | local row id |
-| turn_key | text | opaque correlation key |
-| started_at | datetime | first observed turn time |
-| completed_at | datetime nullable | final observed completion |
-| mode | text | mode at turn start |
+| turn_key | text | opaque SHA-256-derived local correlation key |
+| started_at | real | first observed turn time |
+| completed_at | real nullable | completion time |
+| mode | text | effective mode for this process/turn |
 | route_family | text nullable | selected family |
-| route_applied | boolean | whether filtering applied |\n| route_reason | text nullable | filtered/shadow/mode_off/fallback reason code |
+| route_applied | boolean | whether filtering applied |
+| route_reason | text nullable | filtered/shadow/mode_off/fallback reason |
 | duration_ms | real nullable | end-to-end observed turn duration |
-| llm_requests | integer | provider/LLM requests in turn |
-| tool_calls | integer | tool calls in turn |
+| llm_requests | integer | provider/LLM requests |
+| tool_calls | integer | tool calls |
 | input_tokens | integer nullable | provider-reported aggregate |
 | cached_input_tokens | integer nullable | provider-reported aggregate |
 | output_tokens | integer nullable | provider-reported aggregate |
 | reasoning_tokens | integer nullable | provider-reported aggregate |
-| status | text | complete/aborted/error/unknown |
-| benchmark_run_id | text nullable | controlled benchmark grouping only |
+| status | text | running/complete/interrupted/error/unknown |
+| benchmark_run_id | text nullable | random controlled-benchmark run correlation |
+| benchmark_sample_id | text nullable | random controlled-benchmark sample correlation |
+| benchmark_fixture_id | text nullable | public fixture identifier |
+| benchmark_warmup | boolean | whether sample is warm-up only |
 
-Again, no prompt or tool payload fields.
+Benchmark tags contain identifiers only. They do not contain prompt text.
 
-## 5. Settings/audit record
+## 5. Mode changes
 
-Mode changes are auditable locally in the `mode_changes` table with metadata only:
+`mode_changes` stores local metadata:
 
 ```text
 timestamp
 old_mode
 new_mode
-source: command | dashboard | cli | config
+source: slash | dashboard | cli | benchmark | config
 ```
 
-No chat ID or user identity is stored for v1 metrics. `turn_key` is generated from Hermes correlation IDs with SHA-256 and only a shortened opaque digest is persisted.
+The Phase 8 live benchmark uses a process-scoped mode override and therefore does not need to mutate the user's persistent mode.
 
-## 5.1 Storage location\n\nBy default, metrics live under the active Hermes profile at:\n\n```text\n$HERMES_HOME/plugin-data/hermes-jev-performance/metrics.sqlite3\n```\n\nThe database uses versioned migrations. Schema v2 is the current Phase 6 schema. A database with a newer unknown schema fails closed for telemetry only; Hermes routing remains independent.\n\n## 6. Core calculations
+## 6. Storage location and migrations
 
-### Jev latency
+By default:
 
-- p50
-- p95
-- mean
-- maximum
-- timeout rate
+```text
+$HERMES_HOME/plugin-data/hermes-jev-performance/metrics.sqlite3
+```
 
-### Routing quality proxy metrics
+Current schema version: **3**.
 
+Migration path:
+
+```text
+v1 -> v2 -> v3
+```
+
+A database with a newer unknown schema fails closed for telemetry only; Hermes routing remains independent.
+
+## 7. Organic metrics
+
+Organic dashboard queries explicitly exclude rows where `benchmark_run_id IS NOT NULL`.
+
+This applies to:
+
+- summary totals;
+- route distribution;
+- recent Jev decisions;
+- fallback reasons;
+- OFF/SHADOW/ON observational comparison;
+- Hermes time-series data.
+
+Controlled benchmark activity must never silently change ordinary usage charts.
+
+## 8. Core calculations
+
+### Jev operational metrics
+
+- mean/p50/p95/max latency where implemented;
+- confidence;
+- provider-reported cost;
 - decisions by family;
-- confidence distribution;
-- accepted percentage;
-- applied percentage;
-- `multi` percentage;
-- low-confidence fallback percentage;
-- error/fail-open percentage;
-- zero-tool fallback percentage.
+- accepted/applied percentage;
+- multi/low-confidence/error/fail-open rates.
 
-These are operational metrics, not proof of semantic accuracy.
+These are operational metrics, not semantic-accuracy proof.
 
-### Hermes outcome metrics
+### Hermes outcomes
 
-Per mode:
+Per mode or controlled sample:
 
-- mean/median turn duration;
-- mean/median tool calls;
-- mean/median LLM requests;
+- turn duration;
+- tool calls;
+- LLM requests;
 - input/output/cache/reasoning tokens when available;
-- completion/error rate where observable.
+- completion/error state.
 
-## 7. Observational comparison
+Missing values remain unavailable and are never estimated.
 
-Dashboard may compare ordinary OFF, SHADOW and ON usage, but must label it **observational** because requests differ.
+## 9. Observational comparison
 
-Recommended wording:
+Ordinary OFF, SHADOW and ON usage may be compared, but must be labelled observational:
 
 > Observational usage comparison. Workloads are not matched, so differences are not necessarily caused by Jev.
 
-## 8. Controlled A/B benchmark
+## 10. Controlled benchmark schema
 
-A controlled benchmark uses matched tasks under defined conditions.
+Schema v3 adds `benchmark_runs` and `benchmark_samples`.
 
-Minimum methodology:
+### benchmark_runs
 
-1. Pin Hermes/plugin/Jev model versions.
-2. Record benchmark environment metadata without private host identifiers.
-3. Warm required caches consistently or explicitly test cold vs warm separately.
-4. Run the same safe workload set under OFF and ON.
-5. Randomize or alternate order where practical to reduce time-of-day/provider drift.
-6. Repeat enough times to avoid treating one run as a conclusion.
-7. Store benchmark results with a `benchmark_run_id`.
-8. Report absolute values and deltas.
-9. Do not merge benchmark and organic usage statistics.
+Stores only reproducibility metadata:
 
-## 9. Benchmark safety
+- random run ID;
+- created/completed timestamps;
+- run status;
+- benchmark version;
+- fixture-set SHA-256;
+- fixture count;
+- repeat/warm-up counts;
+- safe environment JSON;
+- methodology JSON.
 
-CI uses mocks/fixtures, never paid live APIs.
+### benchmark_samples
 
-Optional real benchmark tasks must be read-only or use disposable fixtures by default. No benchmark should send email, alter GitHub, modify production files, purchase anything, or perform irreversible external actions.
+Stores only metadata/results:
 
-## 10. Performance deltas
+- random sample ID;
+- run ID;
+- public fixture ID/family;
+- OFF/ON mode;
+- repeat/order index;
+- warm-up flag;
+- status;
+- runner duration;
+- exit code and validation flag;
+- Hermes duration;
+- tool/LLM counts;
+- token fields;
+- route family/applied flag;
+- Jev latency/cost/confidence;
+- normalized error category.
+
+No prompt or tool payload fields exist.
+
+## 11. Controlled A/B methodology
+
+Minimum methodology implemented in Phase 8:
+
+1. Pin plugin/Hermes/Jev version metadata.
+2. Hash the exact fixture set.
+3. Use read-only fixtures by default.
+4. Warm OFF and ON consistently.
+5. Exclude warm-ups from deltas.
+6. Pair samples by `fixture_id + repeat_index`.
+7. Alternate order between OFF→ON and ON→OFF on subsequent repeats.
+8. Require at least two measured repeats.
+9. Store benchmark records separately.
+10. Report absolute values and deltas.
+11. Do not automatically turn lower resource use into a quality verdict.
+
+Full reproducibility instructions are in [BENCHMARK.md](BENCHMARK.md).
+
+## 12. Performance deltas
 
 For metric M:
 
 ```text
-absolute_delta = ON - OFF
-percent_change = ((ON - OFF) / OFF) * 100
+absolute_delta = ON mean - OFF mean
+percent_change = ((ON mean - OFF mean) / OFF mean) * 100
 ```
 
-For duration/tokens/tool calls, negative percentage generally means less resource/time. UI wording must avoid calling a result "faster" if the sample/methodology does not justify it.
+Warm-ups and incomplete/unmatched pairs are excluded.
 
-## 11. Cost
+Negative duration/tool/token percentage means ON used less of that metric. It must not automatically be described as "better" without considering failures and result quality.
 
-Jev cost should come from provider-returned usage when available. If unavailable, display `unavailable` by default. A price-table estimate may be a future optional feature but must be explicitly labelled estimated.
+## 13. Synthetic CI benchmark
 
-## 12. Retention
+CI uses `benchmarks/fixtures/ci_synthetic.json`.
+
+It:
+
+- makes zero Hermes/provider/OpenRouter calls;
+- exercises the same pairing and delta engine;
+- provides deterministic OFF/ON values;
+- verifies warm-up exclusion and comparison math.
+
+## 14. Live benchmark safety
+
+Live execution is explicit:
+
+```bash
+hermes jev benchmark --live
+```
+
+Without `--live`, the CLI only prints the benchmark plan.
+
+The live runner:
+
+- uses process-scoped OFF/ON overrides;
+- leaves the user's persistent Jev mode unchanged;
+- defaults to offline/read-only fixtures;
+- requires `--include-network` for the public-web fixture;
+- never performs app/email/GitHub mutation fixtures by default.
+
+## 15. Export
+
+An anonymized JSON export contains safe environment/methodology metadata, comparison results and content-free sample metrics.
+
+It excludes:
+
+- prompts;
+- tool payloads;
+- sample IDs;
+- raw Hermes turn IDs;
+- filesystem paths;
+- host/user identifiers;
+- undeclared environment values.
+
+## 16. Cost
+
+Jev cost comes from provider-returned usage when available. Missing cost is displayed as unavailable.
+
+The live benchmark can also incur the user's normal Hermes primary-model/provider usage. That is why execution requires the explicit `--live` flag.
+
+## 17. Retention
 
 Default target: 30 days, configurable.
 
-Retention cleanup deletes old metrics locally and is throttled to run at most once per hour per active profile during normal telemetry collection. A manual clear operation must require explicit user action in CLI/dashboard and must not touch Hermes conversation history.
+Retention cleanup deletes old organic telemetry and benchmark records locally. It runs at most once per hour per active profile during normal collection.
+
+Deleting metrics must never touch Hermes conversation history.

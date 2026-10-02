@@ -94,6 +94,14 @@ Recommended first-run mode is `shadow`, not `on`.
 
 **Status:** Accepted
 
-Controlled A/B runs are stored/tagged separately from ordinary usage.
+Controlled A/B runs are stored/tagged separately from ordinary usage. Schema v3 adds dedicated `benchmark_runs` and `benchmark_samples` tables plus benchmark correlation columns on Hermes turn rows. Organic dashboard queries explicitly exclude benchmark-tagged rows.
 
-**Why:** unmatched organic requests cannot support a causal speed claim.
+**Why:** unmatched organic requests cannot support a causal speed claim, and benchmark traffic must never silently distort ordinary usage charts.
+
+## ADR-013 - Benchmark mode is process-scoped
+
+**Status:** Accepted
+
+The live benchmark passes OFF/ON through validated benchmark-only environment context to each spawned Hermes process. It does not change the user's persistent plugin mode.
+
+**Why:** a benchmark may run while Telegram or another Hermes session is active. Temporarily changing the global mode would contaminate unrelated turns and could change normal user behavior during the experiment.

@@ -76,6 +76,8 @@ class DashboardApiContractTests(unittest.TestCase):
                 ("GET", "/status"),
                 ("GET", "/summary"),
                 ("GET", "/analytics"),
+                ("GET", "/benchmarks"),
+                ("GET", "/benchmarks/{run_id}/export"),
                 ("PUT", "/mode"),
             },
         )
@@ -135,6 +137,29 @@ class DashboardApiContractTests(unittest.TestCase):
         self.assertNotIn("window.__HERMES_SESSION_TOKEN__", source)
         self.assertNotIn("document.cookie", source)
 
+    def test_benchmark_export_not_found_is_safe_404(self):
+        module = load_api_module()
+
+        def missing(run_id):
+            raise KeyError("PRIVATE_INTERNAL_DETAIL")
+
+        module.benchmark_export_payload = missing
+        with self.assertRaises(FakeHTTPException) as caught:
+            asyncio.run(module.get_benchmark_export("bench-missing"))
+        self.assertEqual(caught.exception.status_code, 404)
+        self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
+
+    def test_benchmark_list_failure_is_safe_503(self):
+        module = load_api_module()
+
+        def failed(limit=10):
+            raise RuntimeError("PRIVATE_INTERNAL_DETAIL")
+
+        module.benchmark_runs_payload = failed
+        with self.assertRaises(FakeHTTPException) as caught:
+            asyncio.run(module.get_benchmarks(limit=10))
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
 
 if __name__ == "__main__":
     unittest.main()

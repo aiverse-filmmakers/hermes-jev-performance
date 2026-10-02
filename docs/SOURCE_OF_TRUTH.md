@@ -68,7 +68,8 @@ These may become later modules only through an ADR and separate milestone.
 - [`PRD.md`](PRD.md): product requirements and acceptance criteria.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): runtime design, modules, data flow, storage and interfaces.
 - [`ROADMAP.md`](ROADMAP.md): phases, tasks, subtasks and gates.
-- [`TELEMETRY.md`](TELEMETRY.md): metric definitions and A/B methodology.
+- [`TELEMETRY.md`](TELEMETRY.md): metric definitions and storage contract.
+- [`BENCHMARK.md`](BENCHMARK.md): controlled matched benchmark methodology, safety, execution and export.
 - [`TESTING.md`](TESTING.md): test layers, fixtures and release gates.
 - [`SECURITY.md`](SECURITY.md): privacy, credentials, dashboard exposure and threat boundaries.
 - [`UPSTREAMS.md`](UPSTREAMS.md): upstream repositories, inspected snapshots and reuse plan.

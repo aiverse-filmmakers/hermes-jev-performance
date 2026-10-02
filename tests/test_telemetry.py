@@ -1,7 +1,16 @@
+import os
+import sqlite3
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
+from jevperf.benchmark_context import (
+    FIXTURE_ID_ENV,
+    RUN_ID_ENV,
+    SAMPLE_ID_ENV,
+    WARMUP_ENV,
+)
 from jevperf.routing import RoutingDecision
 from jevperf.store import StoreProvider
 from jevperf.telemetry import TelemetryObserver
@@ -124,6 +133,44 @@ class TelemetryTests(unittest.TestCase):
         observer = TelemetryObserver(FakeContext(), stores=BrokenProvider())
         self.assertIsNotNone(observer.start_turn("s", "t"))
 
+    def test_explicit_benchmark_env_tags_turn_without_content(self):
+        observer, path = self.make_observer()
+        env = {
+            RUN_ID_ENV: "bench-safe",
+            SAMPLE_ID_ENV: "sample-safe",
+            FIXTURE_ID_ENV: "files-read-readme-heading",
+            WARMUP_ENV: "0",
+        }
+        with mock.patch.dict(os.environ, env, clear=False):
+            observer.on_pre_api_request(
+                session_id="private-session",
+                turn_id="private-turn",
+                user_message="BENCHMARK_PROMPT_MUST_NOT_PERSIST",
+            )
+            observer.on_session_end(
+                session_id="private-session",
+                turn_id="private-turn",
+                completed=True,
+                failed=False,
+                interrupted=False,
+            )
+
+        with sqlite3.connect(path) as con:
+            row = con.execute(
+                """
+                SELECT benchmark_run_id, benchmark_sample_id,
+                       benchmark_fixture_id, benchmark_warmup
+                FROM hermes_turns
+                """
+            ).fetchone()
+        self.assertEqual(
+            row,
+            ("bench-safe", "sample-safe", "files-read-readme-heading", 0),
+        )
+        raw = path.read_bytes()
+        self.assertNotIn(b"BENCHMARK_PROMPT_MUST_NOT_PERSIST", raw)
+        self.assertNotIn(b"private-session", raw)
+        self.assertNotIn(b"private-turn", raw)
 
 if __name__ == "__main__":
     unittest.main()
