@@ -617,10 +617,22 @@ class MetricsStore:
             rows = con.execute(
                 """
                 SELECT
-                    created_at, mode, provider, requested_model, actual_model,
-                    family, confidence, latency_ms, cost_usd,
-                    input_tokens, output_tokens, accepted, applied, reason,
-                    error_category, error_status_code
+                    jd.created_at AS created_at,
+                    jd.mode AS mode,
+                    jd.provider AS provider,
+                    jd.requested_model AS requested_model,
+                    jd.actual_model AS actual_model,
+                    jd.family AS family,
+                    jd.confidence AS confidence,
+                    jd.latency_ms AS latency_ms,
+                    jd.cost_usd AS cost_usd,
+                    jd.input_tokens AS input_tokens,
+                    jd.output_tokens AS output_tokens,
+                    jd.accepted AS accepted,
+                    jd.applied AS applied,
+                    jd.reason AS reason,
+                    jd.error_category AS error_category,
+                    jd.error_status_code AS error_status_code
                 FROM jev_decisions AS jd
                 LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
                 WHERE jd.created_at >= ?
