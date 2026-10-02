@@ -37,6 +37,10 @@ v1 adoption:
 - reuse dashboard ideas;
 - do **not** automatically import its broader memory/search/screening/GUI/mailbox feature set.
 
+Phase 2 concrete adoption:
+
+- `jevperf/client.py` also adopts selected validation/transport safety ideas from `jevkit/client.py`, while deliberately avoiding its broader provider matrix and connection-pool complexity in the first OpenRouter-only implementation.
+
 ## 2. vinilana/jev-gateway
 
 Repository: https://github.com/vinilana/jev-gateway
@@ -78,6 +82,13 @@ v1 adoption:
 - reuse/adapt the OpenRouter client/provider logic;
 - reuse safety/credential patterns where compatible;
 - do not enable its automatic model switching in v1.
+
+Phase 2 concrete adoption:
+
+- `jevperf/client.py` is adapted in part from upstream `client.py` at the reference commit above, reduced to the OpenRouter-only surface required by this project;
+- response validation, bounded payload/response handling, safe error categories and no-automatic-retry behavior follow the upstream safety model;
+- `jevperf/credentials.py` uses a dedicated Jev credential first while supporting a documented generic OpenRouter compatibility fallback;
+- the default remains the pinned `typesafe/jev-1.13` model for reproducible performance comparisons. The OpenRouter alias `~typesafe/jev-latest` is accepted as an explicit configurable override rather than silently changing benchmark model versions.
 
 ## 4. NousResearch/hermes-agent
 
