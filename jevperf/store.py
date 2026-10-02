@@ -56,6 +56,25 @@ def _integer(value: Any) -> int | None:
     return max(0, value)
 
 
+def _percentile(values: list[float], fraction: float) -> float | None:
+    """Linear-interpolated percentile over finite sorted metadata values."""
+    clean = sorted(
+        float(value)
+        for value in values
+        if isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    )
+    if not clean:
+        return None
+    if len(clean) == 1:
+        return clean[0]
+    position = max(0.0, min(1.0, float(fraction))) * (len(clean) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(clean) - 1)
+    weight = position - lower
+    return clean[lower] + ((clean[upper] - clean[lower]) * weight)
+
+
 @dataclass(frozen=True)
 class StatsSummary:
     since_hours: int
@@ -65,6 +84,9 @@ class StatsSummary:
     fallback: int
     avg_confidence: float | None
     avg_jev_latency_ms: float | None
+    p50_jev_latency_ms: float | None
+    p95_jev_latency_ms: float | None
+    avg_jev_cost_usd: float | None
     total_jev_cost_usd: float | None
     avg_turn_duration_ms: float | None
     avg_tool_calls: float | None
@@ -610,6 +632,7 @@ class MetricsStore:
                     COALESCE(SUM(applied), 0) AS applied,
                     AVG(confidence) AS avg_confidence,
                     AVG(latency_ms) AS avg_latency,
+                    AVG(cost_usd) AS avg_cost,
                     SUM(cost_usd) AS total_cost
                 FROM jev_decisions AS jd
                 LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
@@ -618,6 +641,19 @@ class MetricsStore:
                 """,
                 (cutoff,),
             ).fetchone()
+
+            latency_rows = con.execute(
+                """
+                SELECT jd.latency_ms AS latency_ms
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
+                  AND jd.latency_ms IS NOT NULL
+                ORDER BY jd.latency_ms ASC
+                """,
+                (cutoff,),
+            ).fetchall()
 
             turns = con.execute(
                 """
@@ -658,6 +694,15 @@ class MetricsStore:
             fallback=max(0, decision_count - applied),
             avg_confidence=_number(decisions["avg_confidence"]),
             avg_jev_latency_ms=_number(decisions["avg_latency"]),
+            p50_jev_latency_ms=_percentile(
+                [float(row["latency_ms"]) for row in latency_rows],
+                0.50,
+            ),
+            p95_jev_latency_ms=_percentile(
+                [float(row["latency_ms"]) for row in latency_rows],
+                0.95,
+            ),
+            avg_jev_cost_usd=_number(decisions["avg_cost"]),
             total_jev_cost_usd=_number(decisions["total_cost"]),
             avg_turn_duration_ms=_number(turns["avg_duration"]),
             avg_tool_calls=_number(turns["avg_tools"]),
