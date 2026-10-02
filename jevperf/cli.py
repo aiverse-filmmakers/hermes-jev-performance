@@ -11,6 +11,7 @@ from .benchmark_export import write_anonymized_export
 from .benchmark_runner import benchmark_plan_summary, run_live_benchmark
 from .commands import render_stats, render_status, set_mode, set_notice
 from .doctor import render_doctor, run_doctor
+from .smoke import run_smoke
 
 
 def _fmt_delta(metric: dict[str, Any]) -> str:
@@ -32,6 +33,10 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         sub.add_parser("off", help="Disable Jev routing.")
         sub.add_parser("shadow", help="Run Jev decisions without changing Hermes tools.")
         sub.add_parser("stats", help="Show local Jev/Hermes performance stats.")
+        sub.add_parser(
+            "smoke",
+            help="Explicitly make one live OpenRouter Jev Decisions API call.",
+        )
 
         doctor = sub.add_parser("doctor", help="Run local Jev diagnostics without network calls.")
         doctor.add_argument("--json", action="store_true", help="Print machine-readable diagnostic JSON.")
@@ -80,6 +85,10 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         if action == "stats":
             print(render_stats(telemetry))
             return 0
+        if action == "smoke":
+            code, payload = run_smoke()
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return code
         if action == "doctor":
             report = run_doctor(
                 ctx,
@@ -139,6 +148,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             print(f"Benchmark run: {run['run_id']}")
             print(f"Status: {run['status']}")
             print(f"Matched pairs: {comparison['matched_pairs']}")
+            print(f"Invalid ON routing samples: {comparison['invalid_routing_samples']['on']}")
             for key, label in (
                 ("hermes_duration_ms", "Hermes duration"),
                 ("tool_calls", "Tool calls"),
@@ -158,7 +168,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print(f"Export: {written}")
             return 0
 
-        print("Usage: hermes jev {status|on|off|shadow|stats|doctor|notice|benchmark}")
+        print("Usage: hermes jev {status|on|off|shadow|stats|smoke|doctor|notice|benchmark}")
         return 2
 
     return setup, handler
