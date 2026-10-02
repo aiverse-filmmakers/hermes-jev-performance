@@ -8,6 +8,7 @@ from jevperf.benchmark import (
     capture_environment,
     fixture_set_hash,
     load_fixture_suite,
+    run_synthetic_benchmark,
 )
 
 
@@ -100,6 +101,17 @@ class BenchmarkTests(unittest.TestCase):
         self.assertTrue(forbidden.isdisjoint(env))
         self.assertEqual(env["fixture_set_sha256"], "a" * 64)
 
+    def test_synthetic_ci_benchmark_makes_zero_network_calls(self):
+        result = run_synthetic_benchmark(
+            ROOT / "benchmarks" / "fixtures" / "ci_synthetic.json",
+            repeats=3,
+            warmups=1,
+        )
+        self.assertEqual(result["kind"], "synthetic_ci")
+        self.assertEqual(result["network_calls"], 0)
+        self.assertEqual(result["comparison"]["matched_pairs"], 9)
+        duration = result["comparison"]["metrics"]["hermes_duration_ms"]
+        self.assertLess(duration["percent_change"], 0)
 
 if __name__ == "__main__":
     unittest.main()
