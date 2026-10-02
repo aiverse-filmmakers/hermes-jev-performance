@@ -1,0 +1,102 @@
+[
+  {
+    "id": "github-1",
+    "family": "github",
+    "prompt": "Check the failed GitHub Actions workflow in this repository."
+  },
+  {
+    "id": "github-2",
+    "family": "github",
+    "prompt": "Review the open pull request and summarize the changed files."
+  },
+  {
+    "id": "apps-1",
+    "family": "apps",
+    "prompt": "Search my connected email for the latest invoice."
+  },
+  {
+    "id": "apps-2",
+    "family": "apps",
+    "prompt": "Check my connected calendar for tomorrow's meetings."
+  },
+  {
+    "id": "web-1",
+    "family": "web",
+    "prompt": "Search the public web for the latest release notes."
+  },
+  {
+    "id": "web-2",
+    "family": "web",
+    "prompt": "Open the vendor documentation site and find the current API limit."
+  },
+  {
+    "id": "terminal-1",
+    "family": "terminal",
+    "prompt": "Check current RAM and disk usage on this machine."
+  },
+  {
+    "id": "terminal-2",
+    "family": "terminal",
+    "prompt": "List which local process is listening on port 8080."
+  },
+  {
+    "id": "files-1",
+    "family": "files",
+    "prompt": "Read the local README file and summarize the install section."
+  },
+  {
+    "id": "files-2",
+    "family": "files",
+    "prompt": "Find this exact phrase across the local project files."
+  },
+  {
+    "id": "memory-1",
+    "family": "memory",
+    "prompt": "Use your memory to tell me what preference I gave you earlier."
+  },
+  {
+    "id": "memory-2",
+    "family": "memory",
+    "prompt": "Recall the project constraint I asked you to remember."
+  },
+  {
+    "id": "skills-1",
+    "family": "skills",
+    "prompt": "List the installed Hermes skills for repository work."
+  },
+  {
+    "id": "skills-2",
+    "family": "skills",
+    "prompt": "Open the relevant Hermes skill and explain what it does."
+  },
+  {
+    "id": "media-1",
+    "family": "media",
+    "prompt": "Analyze the attached screenshot and describe the visible error."
+  },
+  {
+    "id": "media-2",
+    "family": "media",
+    "prompt": "Use text to speech to read this short sentence aloud."
+  },
+  {
+    "id": "none-1",
+    "family": "none",
+    "prompt": "Explain recursion in two sentences."
+  },
+  {
+    "id": "none-2",
+    "family": "none",
+    "prompt": "Rewrite this sentence to be shorter without using tools."
+  },
+  {
+    "id": "multi-1",
+    "family": "multi",
+    "prompt": "Research the latest release online and save a summary into a local file."
+  },
+  {
+    "id": "multi-2",
+    "family": "multi",
+    "prompt": "Inspect the GitHub issue, compare it with the public documentation, then write a local report."
+  }
+]
