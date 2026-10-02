@@ -15,6 +15,9 @@ class FakeStats:
     fallback = 2
     avg_confidence = 0.91
     avg_jev_latency_ms = 412.3
+    p50_jev_latency_ms = 400
+    p95_jev_latency_ms = 700
+    avg_jev_cost_usd = 0.0000122
     total_jev_cost_usd = 0.000061
     avg_turn_duration_ms = 14250
     avg_tool_calls = 2.5
@@ -115,8 +118,9 @@ class CommandTests(unittest.TestCase):
         result = handle_jev_command(FakeContext(), "stats", telemetry=telemetry)
         self.assertEqual(telemetry.since_hours, 24)
         self.assertIn("Jev decisions: 5", result)
+        self.assertIn("Jev latency p50/p95: 400ms / 700ms", result)
         self.assertIn("Avg Jev latency: 412ms", result)
-        self.assertIn("Jev cost: $0.000061", result)
+        self.assertIn("Jev cost avg/total: $0.00001220 / $0.000061", result)
         self.assertIn("Routes: web:3, terminal:2", result)
 
     def test_setting_failure_is_explicit(self):
