@@ -22,13 +22,13 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 **Goal:** a clean plugin that loads but does not yet call Jev.
 
 - [x] 1.1 Create `plugin.yaml` with explicit manifest/version/license.
-- [ ] 1.2 Create minimal `register(ctx)` entry point.
-- [ ] 1.3 Add package/module layout.
-- [ ] 1.4 Add config validation and defaults.
-- [ ] 1.5 Add compatibility feature detection.
-- [ ] 1.6 Add `/jev status` with no secrets.
-- [ ] 1.7 Add unit tests for config and command parsing.
-- [ ] 1.8 Add CI lint/test workflow.
+- [x] 1.2 Create minimal `register(ctx)` entry point.
+- [x] 1.3 Add package/module layout.
+- [x] 1.4 Add config validation and defaults.
+- [x] 1.5 Add compatibility feature detection.
+- [x] 1.6 Add `/jev status` with no secrets.
+- [x] 1.7 Add unit tests for config and command parsing.
+- [x] 1.8 Add CI lint/test workflow.
 
 **Gate P1:** plugin doctor/import passes; `/jev status` works; no Jev network calls exist yet.
 
