@@ -122,19 +122,19 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** performance dashboard inside `hermes dashboard`.
 
-- [ ] 7.1 Add dashboard manifest.
-- [ ] 7.2 Add pre-built SDK UI bundle.
-- [ ] 7.3 Add `plugin_api.py` FastAPI router.
-- [ ] 7.4 Status/mode card.
-- [ ] 7.5 Jev latency/confidence/cost cards.
-- [ ] 7.6 Route distribution.
-- [ ] 7.7 Hermes duration/tool-call/LLM-call/token charts.
-- [ ] 7.8 Recent decisions table.
-- [ ] 7.9 Skipped/fallback reason breakdown.
-- [ ] 7.10 ON vs OFF/shadow comparison.
-- [ ] 7.11 Mode toggle with read-back verification.
-- [ ] 7.12 Responsive/mobile layout.
-- [ ] 7.13 Dashboard API auth/security tests.
+- [x] 7.1 Add dashboard manifest.
+- [x] 7.2 Add pre-built SDK UI bundle.
+- [x] 7.3 Add `plugin_api.py` FastAPI router.
+- [x] 7.4 Status/mode card.
+- [x] 7.5 Jev latency/confidence/cost cards.
+- [x] 7.6 Route distribution.
+- [x] 7.7 Hermes duration/tool-call/LLM-call/token charts.
+- [x] 7.8 Recent decisions table.
+- [x] 7.9 Skipped/fallback reason breakdown.
+- [x] 7.10 ON vs OFF/shadow comparison.
+- [x] 7.11 Mode toggle with read-back verification.
+- [x] 7.12 Responsive/mobile layout.
+- [x] 7.13 Dashboard API auth/security tests.
 
 **Gate P7:** dashboard loads through Hermes plugin discovery, reflects real DB values, and mode toggles are verified.
 
