@@ -1,5 +1,5 @@
 name: hermes-jev-performance
-version: 0.1.0-alpha.3
+version: 0.1.0-alpha.4
 manifest_version: 2
 api_version: 1
 description: Hermes-native Jev tool routing and performance observability.
