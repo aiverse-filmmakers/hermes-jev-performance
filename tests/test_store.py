@@ -202,6 +202,64 @@ class StoreTests(unittest.TestCase):
 
         with self.assertRaises(StoreSchemaError):
             MetricsStore(path).initialize()
+    def test_off_shadow_on_records_are_queryable(self):
+        store, path = self.make_store()
+
+        store.touch_turn("off-turn", "off", now=100)
+        store.record_turn_reason("off-turn", "mode_off")
+        store.finish_turn("off-turn", status="complete", now=101)
+
+        shadow = RoutingDecision(
+            family="web",
+            confidence=0.9,
+            accepted=True,
+            reason="accepted",
+        )
+        store.touch_turn("shadow-turn", "shadow", now=110)
+        store.record_decision(
+            turn_key="shadow-turn",
+            mode="shadow",
+            decision=shadow,
+            applied=False,
+            reason="shadow",
+            now=110.1,
+        )
+        store.finish_turn("shadow-turn", status="complete", now=111)
+
+        on = RoutingDecision(
+            family="terminal",
+            confidence=0.95,
+            accepted=True,
+            reason="accepted",
+        )
+        store.touch_turn("on-turn", "on", now=120)
+        store.record_decision(
+            turn_key="on-turn",
+            mode="on",
+            decision=on,
+            applied=True,
+            reason="filtered",
+            now=120.1,
+        )
+        store.finish_turn("on-turn", status="complete", now=121)
+
+        with sqlite3.connect(path) as con:
+            rows = con.execute(
+                """
+                SELECT mode, route_family, route_applied, route_reason
+                FROM hermes_turns
+                ORDER BY started_at
+                """
+            ).fetchall()
+
+        self.assertEqual(
+            rows,
+            [
+                ("off", None, 0, "mode_off"),
+                ("shadow", "web", 0, "shadow"),
+                ("on", "terminal", 1, "filtered"),
+            ],
+        )
 
 if __name__ == "__main__":
     unittest.main()
