@@ -9,6 +9,7 @@ from jevperf.dashboard_service import (
     benchmark_export_payload,
     benchmark_runs_payload,
 )
+from jevperf.routing import RoutingDecision
 from jevperf.store import MetricsStore
 
 
@@ -45,6 +46,7 @@ class DashboardBenchmarkTests(unittest.TestCase):
             methodology={
                 "kind": "controlled_matched_benchmark",
                 "order_policy": "paired_alternating",
+                "private_note": "DO_NOT_RETURN_METHODOLOGY",
             },
             now=now,
         )
@@ -80,10 +82,10 @@ class DashboardBenchmarkTests(unittest.TestCase):
             store.increment_tool_call(turn_key)
             store.record_runtime_identity(
                 turn_key,
-                provider="synthetic-provider",
-                requested_model="synthetic-model",
-                response_model="synthetic-model-v1",
-                api_mode="synthetic-api",
+                provider="/Users/private/provider",
+                requested_model="/Users/private/model",
+                response_model="private-org/model-v1",
+                api_mode="private-api-mode",
             )
             store.add_usage(
                 turn_key,
@@ -92,6 +94,24 @@ class DashboardBenchmarkTests(unittest.TestCase):
                     "output_tokens": 100 if mode == "off" else 90,
                 },
             )
+            if mode == "on":
+                store.record_decision(
+                    turn_key=turn_key,
+                    mode="on",
+                    decision=RoutingDecision(
+                        family="files",
+                        confidence=0.95,
+                        accepted=True,
+                        reason="accepted",
+                        latency_ms=150,
+                        cost_usd=0.00001,
+                    ),
+                    applied=True,
+                    reason="filtered",
+                    now=now + index + 0.1,
+                )
+            else:
+                store.record_turn_reason(turn_key, "mode_off")
             store.finish_turn(
                 turn_key,
                 status="complete",
@@ -111,7 +131,7 @@ class DashboardBenchmarkTests(unittest.TestCase):
             now=now + 10,
         )
 
-    def test_dashboard_list_contains_comparison_not_sample_ids(self):
+    def test_dashboard_list_contains_comparison_not_private_runtime_identity(self):
         store = self.make_store()
         self.seed(store)
         payload = benchmark_runs_payload(limit=10, store=store)
@@ -119,13 +139,35 @@ class DashboardBenchmarkTests(unittest.TestCase):
         self.assertEqual(len(payload["runs"]), 1)
         run = payload["runs"][0]
         self.assertEqual(run["comparison"]["matched_pairs"], 2)
-        self.assertEqual(run["hermes_providers"], ["synthetic-provider"])
-        self.assertEqual(run["hermes_models"], ["synthetic-model-v1"])
-        self.assertEqual(run["hermes_api_modes"], ["synthetic-api"])
+        self.assertEqual(run["failed_samples"], 0)
+        self.assertNotIn("hermes_providers", run)
+        self.assertNotIn("hermes_models", run)
+        self.assertNotIn("hermes_api_modes", run)
         serialized = repr(payload)
         self.assertNotIn("private-sample", serialized)
         self.assertNotIn("private-turn", serialized)
         self.assertNotIn("DO_NOT_RETURN", serialized)
+        self.assertNotIn("DO_NOT_RETURN_METHODOLOGY", serialized)
+        self.assertNotIn("/Users/private", serialized)
+        self.assertNotIn("private-org", serialized)
+        self.assertNotIn("private-api-mode", serialized)
+
+    def test_dashboard_counts_routing_invalid_on_sample_as_failed(self):
+        store = self.make_store()
+        self.seed(store)
+        with store._connection() as con:
+            con.execute(
+                """
+                UPDATE benchmark_samples
+                SET route_family = 'web', route_applied = 0
+                WHERE mode = 'on' AND repeat_index = 0
+                """
+            )
+        payload = benchmark_runs_payload(limit=10, store=store)
+        run = payload["runs"][0]
+        self.assertEqual(run["comparison"]["matched_pairs"], 1)
+        self.assertEqual(run["comparison"]["invalid_routing_samples"]["on"], 1)
+        self.assertEqual(run["failed_samples"], 1)
 
     def test_dashboard_export_is_anonymized(self):
         store = self.make_store()
@@ -135,6 +177,8 @@ class DashboardBenchmarkTests(unittest.TestCase):
         self.assertNotIn("private-sample", serialized)
         self.assertNotIn("private-turn", serialized)
         self.assertNotIn("DO_NOT_RETURN", serialized)
+        self.assertNotIn("/Users/private", serialized)
+        self.assertNotIn("private-org", serialized)
         self.assertEqual(
             payload["comparison"]["interpretation"],
             "controlled_matched_benchmark",
