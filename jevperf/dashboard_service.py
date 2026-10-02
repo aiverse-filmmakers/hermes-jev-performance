@@ -274,6 +274,21 @@ def benchmark_runs_payload(
         }
         measured = [sample for sample in samples if not sample.get("is_warmup")]
         failed = [sample for sample in measured if sample.get("status") != "complete"]
+        hermes_providers = sorted({
+            str(sample["hermes_provider"])
+            for sample in measured
+            if sample.get("hermes_provider")
+        })
+        hermes_models = sorted({
+            str(sample.get("hermes_response_model") or sample.get("hermes_requested_model"))
+            for sample in measured
+            if sample.get("hermes_response_model") or sample.get("hermes_requested_model")
+        })
+        hermes_api_modes = sorted({
+            str(sample["hermes_api_mode"])
+            for sample in measured
+            if sample.get("hermes_api_mode")
+        })
         runs.append(
             {
                 "run_id": run["run_id"],
@@ -289,6 +304,9 @@ def benchmark_runs_payload(
                 "methodology": run.get("methodology", {}),
                 "measured_samples": len(measured),
                 "failed_samples": len(failed),
+                "hermes_providers": hermes_providers,
+                "hermes_models": hermes_models,
+                "hermes_api_modes": hermes_api_modes,
                 "comparison": calculate_comparison(samples),
             }
         )
