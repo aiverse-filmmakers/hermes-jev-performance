@@ -62,9 +62,14 @@ def render_stats(telemetry: Any) -> str:
         return "Jev stats (last 24h)\nNo telemetry recorded yet."
 
     routes = ", ".join(f"{name}:{count}" for name, count in stats.routes) or "none"
-    cost = (
+    total_cost = (
         f"${stats.total_jev_cost_usd:.6f}"
         if isinstance(stats.total_jev_cost_usd, (int, float))
+        else "n/a"
+    )
+    avg_cost = (
+        f"${stats.avg_jev_cost_usd:.8f}"
+        if isinstance(stats.avg_jev_cost_usd, (int, float))
         else "n/a"
     )
     input_tokens = str(stats.input_tokens) if stats.input_tokens is not None else "n/a"
@@ -78,8 +83,9 @@ def render_stats(telemetry: Any) -> str:
             f"Routes applied: {stats.applied}",
             f"Fallback/unrestricted: {stats.fallback}",
             f"Avg confidence: {_fmt_float(stats.avg_confidence, digits=2)}",
+            f"Jev latency p50/p95: {_fmt_float(stats.p50_jev_latency_ms, 'ms', 0)} / {_fmt_float(stats.p95_jev_latency_ms, 'ms', 0)}",
             f"Avg Jev latency: {_fmt_float(stats.avg_jev_latency_ms, 'ms', 0)}",
-            f"Jev cost: {cost}",
+            f"Jev cost avg/total: {avg_cost} / {total_cost}",
             f"Avg Hermes turn: {_fmt_float(stats.avg_turn_duration_ms, 'ms', 0)}",
             f"Avg tool calls: {_fmt_float(stats.avg_tool_calls, digits=2)}",
             f"Avg LLM requests: {_fmt_float(stats.avg_llm_requests, digits=2)}",
