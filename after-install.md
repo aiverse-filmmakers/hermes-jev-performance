@@ -20,7 +20,6 @@ Day-to-day controls:
 /jev on
 /jev off
 /jev stats
-/jev doctor
 ```
 
 To disable the plugin itself:
