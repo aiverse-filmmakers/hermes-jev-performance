@@ -39,7 +39,7 @@ Explicit execution:
 hermes jev benchmark --live
 ```
 
-The default local suite is read-only and excludes network access. The optional public-web fixture requires:
+The default workload fixtures are read-only and exclude the public-web fixture. A live benchmark still uses the normal Hermes model/provider, and ON samples also call OpenRouter Jev. The optional public-web workload fixture requires:
 
 ```bash
 hermes jev benchmark --live --include-network
@@ -52,12 +52,12 @@ The runner never changes the user's persistent Jev mode. Each spawned benchmark 
 Defaults:
 
 ```text
-fixtures: 4 offline/read-only
+fixtures: 4 local/read-only workload fixtures
 warmups: 1 per fixture per mode
 measured repeats: 3
 modes: OFF and ON
 order: paired alternating
-network: excluded
+public-web workload fixture: excluded
 ```
 
 That produces:
