@@ -87,16 +87,16 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** day-to-day control without SSH.
 
-- [ ] 5.1 `/jev` status summary.
-- [ ] 5.2 `/jev on`.
-- [ ] 5.3 `/jev off`.
-- [ ] 5.4 `/jev shadow`.
-- [ ] 5.5 `/jev notice on|off`.
-- [ ] 5.6 `/jev stats` concise recent/aggregate summary.
-- [ ] 5.7 Persist settings across restart.
-- [ ] 5.8 Ensure mode takes effect on next fresh turn without reinstall.
-- [ ] 5.9 Add gateway command tests.
-- [ ] 5.10 Add CLI equivalents where supported.
+- [x] 5.1 `/jev` status summary.
+- [x] 5.2 `/jev on`.
+- [x] 5.3 `/jev off`.
+- [x] 5.4 `/jev shadow`.
+- [x] 5.5 `/jev notice on|off`.
+- [x] 5.6 `/jev stats` concise recent/aggregate summary.
+- [x] 5.7 Persist settings across restart.
+- [x] 5.8 Ensure mode takes effect on next fresh turn without reinstall.
+- [x] 5.9 Add gateway command tests.
+- [x] 5.10 Add CLI equivalents where supported.
 
 **Gate P5:** gateway command path toggles routing state and survives restart; no secret is printed.
 
@@ -104,17 +104,17 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** capture accurate Jev and Hermes metadata independently from the dashboard.
 
-- [ ] 6.1 Implement SQLite schema/migrations.
-- [ ] 6.2 Record decision metadata.
-- [ ] 6.3 Record turn lifecycle/duration.
-- [ ] 6.4 Count LLM requests.
-- [ ] 6.5 Count tool calls.
-- [ ] 6.6 Capture provider token fields when supported.
-- [ ] 6.7 Record routing skipped/fallback reasons.
-- [ ] 6.8 Implement retention cleanup.
-- [ ] 6.9 Implement aggregation queries.
-- [ ] 6.10 Add telemetry redaction/no-content tests.
-- [ ] 6.11 Verify DB failure does not break routing.
+- [x] 6.1 Implement SQLite schema/migrations.
+- [x] 6.2 Record decision metadata.
+- [x] 6.3 Record turn lifecycle/duration.
+- [x] 6.4 Count LLM requests.
+- [x] 6.5 Count tool calls.
+- [x] 6.6 Capture provider token fields when supported.
+- [x] 6.7 Record routing skipped/fallback reasons.
+- [x] 6.8 Implement retention cleanup.
+- [x] 6.9 Implement aggregation queries.
+- [x] 6.10 Add telemetry redaction/no-content tests.
+- [x] 6.11 Verify DB failure does not break routing.
 
 **Gate P6:** metrics tests prove no prompt/tool payload persistence and OFF/SHADOW/ON records are queryable.
 

@@ -58,8 +58,13 @@ class TurnTests(unittest.TestCase):
     def test_missing_user_state_fails_open(self):
         self.assertIsNone(extract_routing_state({"messages": [{"role": "assistant", "content": "hi"}]}))
 
-    def test_turn_key_requires_turn_id(self):
-        self.assertEqual(turn_key("s", "t"), "s:t")
+    def test_turn_key_is_opaque_and_stable(self):
+        key = turn_key("sensitive-session-id", "sensitive-turn-id")
+        self.assertIsNotNone(key)
+        self.assertEqual(len(key), 32)
+        self.assertNotIn("sensitive", key)
+        self.assertEqual(key, turn_key("sensitive-session-id", "sensitive-turn-id"))
+        self.assertNotEqual(key, turn_key("sensitive-session-id", "other-turn"))
         self.assertIsNone(turn_key("s", ""))
 
     def test_cache_is_bounded_and_does_not_store_state(self):
@@ -84,7 +89,7 @@ class TurnTests(unittest.TestCase):
 
         def worker():
             barrier.wait()
-            results.append(cache.get_or_compute("session:turn", factory))
+            results.append(cache.get_or_compute("opaque-turn", factory))
 
         threads = [threading.Thread(target=worker) for _ in range(4)]
         for thread in threads:

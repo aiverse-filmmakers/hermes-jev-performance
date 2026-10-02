@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import hashlib
 import re
 import threading
 from typing import Any, Callable
@@ -83,11 +84,13 @@ def extract_routing_state(request: Any) -> str | None:
 
 
 def turn_key(session_id: Any, turn_id: Any) -> str | None:
+    """Return an opaque correlation key without persisting raw Hermes IDs."""
     turn = str(turn_id or "").strip()
     if not turn:
         return None
     session = str(session_id or "").strip()
-    return f"{session}:{turn}"
+    raw = f"{session}\0{turn}".encode("utf-8", errors="replace")
+    return hashlib.sha256(raw).hexdigest()[:32]
 
 
 class TurnDecisionCache:

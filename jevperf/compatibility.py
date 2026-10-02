@@ -21,11 +21,15 @@ def detect_compatibility(ctx: Any) -> dict[str, object]:
     phase1_supported = all(required.values())
     routing_surface_ready = future["register_middleware"]
     persistent_settings_ready = future["set_config"]
+    telemetry_hooks_ready = future["register_hook"]
+    cli_controls_ready = future["register_cli_command"]
 
     return {
         "phase1_supported": phase1_supported,
         "routing_surface_ready": routing_surface_ready,
         "persistent_settings_ready": persistent_settings_ready,
+        "telemetry_hooks_ready": telemetry_hooks_ready,
+        "cli_controls_ready": cli_controls_ready,
         "state_available": hasattr(ctx, "state"),
         "required": required,
         "future": future,

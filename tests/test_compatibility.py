@@ -10,15 +10,25 @@ class CompatibilityTests(unittest.TestCase):
         self.assertTrue(result["phase1_supported"])
         self.assertTrue(result["routing_surface_ready"])
         self.assertTrue(result["persistent_settings_ready"])
+        self.assertTrue(result["telemetry_hooks_ready"])
+        self.assertTrue(result["cli_controls_ready"])
         self.assertTrue(result["state_available"])
 
     def test_feature_detection_degrades(self):
         result = detect_compatibility(
-            FakeContext(middleware=False, set_config=False, state=False)
+            FakeContext(
+                middleware=False,
+                set_config=False,
+                hooks=False,
+                cli=False,
+                state=False,
+            )
         )
         self.assertTrue(result["phase1_supported"])
         self.assertFalse(result["routing_surface_ready"])
         self.assertFalse(result["persistent_settings_ready"])
+        self.assertFalse(result["telemetry_hooks_ready"])
+        self.assertFalse(result["cli_controls_ready"])
         self.assertFalse(result["state_available"])
 
 

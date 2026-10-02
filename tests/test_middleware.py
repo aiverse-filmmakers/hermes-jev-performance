@@ -149,6 +149,25 @@ class MiddlewareTests(unittest.TestCase):
         self.assertIsNone(self.call(mw))
         self.assertEqual(mw.last_filter_reason, "no_family_tools")
 
+    def test_telemetry_failure_never_breaks_routing(self):
+        class BrokenTelemetry:
+            def start_turn(self, *args, **kwargs):
+                raise RuntimeError("telemetry broken")
+
+            def record_decision(self, *args, **kwargs):
+                raise RuntimeError("telemetry broken")
+
+        router = FakeRouter(self.decision("web"))
+        mw = RoutingMiddleware(
+            FakeContext({"mode": "on"}),
+            router=router,
+            telemetry=BrokenTelemetry(),
+        )
+        result = self.call(mw)
+        self.assertIsNotNone(result)
+        names = [item["name"] for item in result["request"]["tools"]]
+        self.assertIn("web_search", names)
+        self.assertNotIn("terminal", names)
 
 if __name__ == "__main__":
     unittest.main()
