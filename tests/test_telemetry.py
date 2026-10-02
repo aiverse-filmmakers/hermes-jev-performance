@@ -103,6 +103,25 @@ class TelemetryTests(unittest.TestCase):
         ):
             self.assertNotIn(marker, raw)
 
+    def test_reduced_session_end_without_turn_id_finishes_latest_turn(self):
+        observer, path = self.make_observer()
+        observer.on_pre_api_request(
+            session_id="session-a",
+            turn_id="turn-a",
+        )
+        observer.on_session_end(
+            session_id="session-a",
+            completed=False,
+            interrupted=True,
+        )
+        with sqlite3.connect(path) as con:
+            row = con.execute(
+                "SELECT status, completed_at, duration_ms FROM hermes_turns"
+            ).fetchone()
+        self.assertEqual(row[0], "interrupted")
+        self.assertIsNotNone(row[1])
+        self.assertIsNotNone(row[2])
+
     def test_disabled_telemetry_creates_no_database(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
