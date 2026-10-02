@@ -1,6 +1,7 @@
 import importlib.util
 import pathlib
 import socket
+import sys
 import unittest
 from unittest import mock
 
@@ -11,14 +12,27 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def load_root_plugin():
+    name = "hermes_jev_performance_plugin"
     spec = importlib.util.spec_from_file_location(
-        "hermes_jev_performance_plugin",
+        name,
         ROOT / "__init__.py",
         submodule_search_locations=[str(ROOT)],
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    spec.loader.exec_module(module)
+
+    # Relative imports in a directory plugin require the package to exist in
+    # sys.modules while its root __init__.py executes, which mirrors normal
+    # package/plugin loading semantics.
+    previous = sys.modules.get(name)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = previous
     return module
 
 
