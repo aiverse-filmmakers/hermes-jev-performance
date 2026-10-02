@@ -16,6 +16,20 @@ from .store import MetricsStore, SCHEMA_VERSION, StatsSummary, default_db_path
 PLUGIN_ID = "hermes-jev-performance"
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 
+_SAFE_BENCHMARK_METHODOLOGY_KEYS = (
+    "kind",
+    "modes",
+    "warmups_excluded_from_deltas",
+    "order_policy",
+    "fixture_order",
+    "read_only_default",
+    "public_web_fixture_included",
+    "timeout_seconds",
+    "sample_count",
+    "measured_sample_count",
+    "on_samples_require_expected_route",
+)
+
 
 class _MappingContext:
     def __init__(self, values: Mapping[str, Any]) -> None:
@@ -240,6 +254,7 @@ def benchmark_runs_payload(
     limit: int = 10,
     store: MetricsStore | None = None,
 ) -> dict[str, Any]:
+    """Return benchmark summaries without arbitrary local runtime identifiers."""
     row_limit = max(1, min(int(limit), 50))
     db_path = default_db_path() if store is None else store.path
     if store is None and not db_path.exists():
@@ -272,23 +287,19 @@ def benchmark_runs_payload(
             )
             if isinstance(environment, dict) and key in environment
         }
+        methodology = run.get("methodology")
+        safe_methodology = {
+            key: methodology.get(key)
+            for key in _SAFE_BENCHMARK_METHODOLOGY_KEYS
+            if isinstance(methodology, dict) and key in methodology
+        }
         measured = [sample for sample in samples if not sample.get("is_warmup")]
-        failed = [sample for sample in measured if sample.get("status") != "complete"]
-        hermes_providers = sorted({
-            str(sample["hermes_provider"])
-            for sample in measured
-            if sample.get("hermes_provider")
-        })
-        hermes_models = sorted({
-            str(sample.get("hermes_response_model") or sample.get("hermes_requested_model"))
-            for sample in measured
-            if sample.get("hermes_response_model") or sample.get("hermes_requested_model")
-        })
-        hermes_api_modes = sorted({
-            str(sample["hermes_api_mode"])
-            for sample in measured
-            if sample.get("hermes_api_mode")
-        })
+        comparison = calculate_comparison(samples)
+        successful = comparison.get("successful_samples", {})
+        successful_count = sum(
+            int(successful.get(mode, 0) or 0)
+            for mode in ("off", "on")
+        )
         runs.append(
             {
                 "run_id": run["run_id"],
@@ -301,13 +312,10 @@ def benchmark_runs_payload(
                 "repeats": run["repeats"],
                 "warmups": run["warmups"],
                 "environment": safe_environment,
-                "methodology": run.get("methodology", {}),
+                "methodology": safe_methodology,
                 "measured_samples": len(measured),
-                "failed_samples": len(failed),
-                "hermes_providers": hermes_providers,
-                "hermes_models": hermes_models,
-                "hermes_api_modes": hermes_api_modes,
-                "comparison": calculate_comparison(samples),
+                "failed_samples": max(0, len(measured) - successful_count),
+                "comparison": comparison,
             }
         )
     return {"database_state": "ready", "runs": runs}
