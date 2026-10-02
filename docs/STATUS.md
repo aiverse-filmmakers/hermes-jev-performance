@@ -1,13 +1,13 @@
 # Implementation Status
 
-**Current stage:** Phase 1 - Hermes plugin skeleton (stacked behind Phase 0 documentation PR).
+**Current stage:** Phase 1 - Hermes plugin skeleton implemented; P1 live Hermes validation pending.
 
 ## Phase status
 
 | Phase | Name | Status | Gate |
 |---|---|---|---|
 | 0 | Foundation and provenance | In review | P0 |
-| 1 | Hermes plugin skeleton | In progress (1/8) | P1 |
+| 1 | Hermes plugin skeleton | Implementation complete (8/8); gate pending | P1 |
 | 2 | OpenRouter Jev client | Not started | P2 |
 | 3 | Tool-family router | Not started | P3 |
 | 4 | Off/Shadow/On middleware | Not started | P4 |
@@ -34,11 +34,11 @@
 
 ## Current blockers
 
-Phase 0 documentation PR must merge before the Phase 1 implementation branch is merged. Phase 1 work may be prepared as a stacked branch in the meantime.
+Phase 0 documentation PR must merge before the Phase 1 implementation branch is merged. P1 still requires one live `hermes plugins doctor <plugin> --ci` validation against a supported Hermes install.
 
 ## Next implementation action
 
-Start **Phase 1.2**: create the minimal no-op `register(ctx)` entry point. It must import/register cleanly and make no network calls.
+Complete **Gate P1** on a supported Hermes install: run Plugin Doctor and verify `/jev status`. After P1 passes, start Phase 2.1 (OpenRouter Decisions client).
 
 ## Status update rule
 
