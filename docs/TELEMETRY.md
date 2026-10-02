@@ -248,7 +248,7 @@ The live runner:
 
 - uses process-scoped OFF/ON overrides;
 - leaves the user's persistent Jev mode unchanged;
-- defaults to offline/read-only fixtures;
+- defaults to local/read-only workload fixtures while still using the configured model/Jev providers;
 - requires `--include-network` for the public-web fixture;
 - never performs app/email/GitHub mutation fixtures by default.
 
