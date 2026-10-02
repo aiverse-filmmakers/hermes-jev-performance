@@ -154,3 +154,17 @@ hermes plugins list
 The plugin must not be enabled after disable, and must not be present after remove.
 
 No Hermes provider/model/auth rollback is needed because this project never replaces those paths.
+
+## Live release gate
+
+Before public beta, run the batched real-environment gate instead of testing lifecycle steps one-by-one:
+
+```bash
+python3 scripts/live_release_gate.py --lifecycle --ref <FULL_COMMIT_SHA>
+```
+
+Add `--live-jev` for one explicit OpenRouter Jev call and `--active-agent` only when real active-profile Hermes turns are acceptable.
+
+The lifecycle portion uses a temporary isolated `HERMES_HOME`, so clean install, disable, re-enable and removal do not touch the live Telegram profile.
+
+See [`LIVE_RELEASE_GATE.md`](LIVE_RELEASE_GATE.md) for the full procedure.
