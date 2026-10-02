@@ -21,7 +21,6 @@ from .benchmark import (
     load_fixture_suite,
 )
 from .benchmark_context import BenchmarkContext, benchmark_env
-from .commands import set_mode
 from .config import read_config
 from .store import MetricsStore, default_db_path
 
@@ -70,12 +69,6 @@ def _store_from_telemetry(telemetry: Any) -> MetricsStore:
     return MetricsStore(default_db_path())
 
 
-def _mode_write(ctx: Any, telemetry: Any, mode: str) -> None:
-    response = set_mode(ctx, mode, telemetry, source="benchmark")
-    if read_config(ctx).mode != mode:
-        raise RuntimeError(f"benchmark mode verification failed after {response}")
-
-
 def _final_report(store: MetricsStore, run_id: str) -> dict[str, Any]:
     run = store.benchmark_run_record(run_id)
     if run is None:
@@ -99,7 +92,10 @@ def run_live_benchmark(
     fixture_path: Path | str = DEFAULT_FIXTURE_PATH,
     executable: str | None = None,
 ) -> dict[str, Any]:
-    """Run explicit paid/local benchmark turns. Never called implicitly."""
+    """Run explicit paid/local benchmark turns with process-scoped OFF/ON modes.
+
+    The user's persistent Jev mode is never changed by the benchmark runner.
+    """
     hermes_executable = executable or shutil.which("hermes")
     if not hermes_executable:
         raise RuntimeError("Hermes executable not found on PATH")
@@ -111,7 +107,6 @@ def run_live_benchmark(
     plan = build_plan(fixtures, repeats=repeats, warmups=warmups)
     run_id = plan[0].run_id
     config = read_config(ctx)
-    original_mode = config.mode
     store = _store_from_telemetry(telemetry)
     fixture_hash = fixture_set_hash(fixtures)
 
@@ -149,12 +144,10 @@ def run_live_benchmark(
 
     by_id = {fixture.fixture_id: fixture for fixture in fixtures}
     run_status = "complete"
-    restore_error: Exception | None = None
 
     try:
         for sample in plan:
             fixture = by_id[sample.fixture_id]
-            _mode_write(ctx, telemetry, sample.mode)
 
             store.plan_benchmark_sample(
                 sample_id=sample.sample_id,
@@ -175,7 +168,8 @@ def run_live_benchmark(
                         sample_id=sample.sample_id,
                         fixture_id=sample.fixture_id,
                         is_warmup=sample.is_warmup,
-                    )
+                    ),
+                    mode=sample.mode,
                 )
             )
 
@@ -224,15 +218,7 @@ def run_live_benchmark(
         run_status = "runner_error"
         raise
     finally:
-        try:
-            _mode_write(ctx, telemetry, original_mode)
-        except Exception as exc:
-            restore_error = exc
-            run_status = "restore_failed"
         store.finish_benchmark_run(run_id, status=run_status)
-
-    if restore_error is not None:
-        raise RuntimeError("benchmark finished but original Jev mode could not be restored")
 
     return _final_report(store, run_id)
 
