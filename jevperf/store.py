@@ -133,6 +133,7 @@ class MetricsStore:
                         mode TEXT NOT NULL,
                         route_family TEXT,
                         route_applied INTEGER NOT NULL DEFAULT 0,
+                        route_reason TEXT,
                         duration_ms REAL,
                         llm_requests INTEGER NOT NULL DEFAULT 0,
                         tool_calls INTEGER NOT NULL DEFAULT 0,
@@ -220,14 +221,23 @@ class MetricsStore:
             con.execute(
                 """
                 UPDATE hermes_turns
-                SET route_family = ?, route_applied = ?
+                SET route_family = ?, route_applied = ?, route_reason = ?
                 WHERE turn_key = ?
                 """,
                 (
                     getattr(decision, "family", None),
                     1 if applied else 0,
+                    str(reason or "unknown"),
                     turn_key,
                 ),
+            )
+
+    def record_turn_reason(self, turn_key: str, reason: str) -> None:
+        self.initialize()
+        with self._connect() as con:
+            con.execute(
+                "UPDATE hermes_turns SET route_reason = ? WHERE turn_key = ?",
+                (str(reason or "unknown"), turn_key),
             )
 
     def increment_llm_request(self, turn_key: str) -> None:
