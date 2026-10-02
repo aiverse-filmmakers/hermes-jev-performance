@@ -32,6 +32,9 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         sub.add_parser("shadow", help="Run Jev decisions without changing Hermes tools.")
         sub.add_parser("stats", help="Show local Jev/Hermes performance stats.")
 
+        doctor = sub.add_parser("doctor", help="Run local Jev diagnostics without network calls.")
+        doctor.add_argument("--json", action="store_true", help="Print machine-readable diagnostic JSON.")
+
         notice = sub.add_parser("notice", help="Control concise reply notices.")
         notice.add_argument("state", choices=("on", "off"))
 
