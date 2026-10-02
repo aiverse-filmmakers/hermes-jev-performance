@@ -13,7 +13,7 @@ This project combines proven ideas from several MIT-licensed Jev/Hermes projects
 
 ## Project status
 
-**Active implementation. Phases 1-8 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
+**Active implementation. Phases 1-9 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
 
 The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_OF_TRUTH.md).
 
