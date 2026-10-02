@@ -119,6 +119,7 @@ Each run records only low-cardinality reproducibility metadata:
 - OS family;
 - CPU architecture string;
 - Jev provider/model;
+- actual Hermes primary provider/model/API mode per sample when exposed by the successful main-loop hook;
 - fixture-set SHA-256;
 - repeat/warm-up counts;
 - order policy.
@@ -127,10 +128,12 @@ It does not record hostname, username, home directory, current working directory
 
 ## Storage separation
 
-Schema v3 adds dedicated:
+Schema v3 introduced the dedicated benchmark tables; schema v4 adds the actual Hermes runtime provider/model/API-mode metadata captured per sample:
 
 - `benchmark_runs`;
 - `benchmark_samples`.
+
+Each measured sample can additionally record the first successful main-loop Hermes provider, requested model, provider-returned response model, and API mode. This comes from Hermes observer-hook metadata, not from private config parsing.
 
 Benchmark Hermes turns are tagged with random benchmark run/sample IDs and public fixture IDs.
 
