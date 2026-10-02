@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Any
 
+from .benchmark_export import write_anonymized_export
+from .benchmark_runner import benchmark_plan_summary, run_live_benchmark
 from .commands import render_stats, render_status, set_mode, set_notice
+
+
+def _fmt_delta(metric: dict[str, Any]) -> str:
+    off = metric.get("off_mean")
+    on = metric.get("on_mean")
+    pct = metric.get("percent_change")
+    if off is None or on is None:
+        return "unavailable"
+    pct_text = "n/a" if pct is None else f"{float(pct):+.1f}%"
+    return f"OFF {float(off):.2f} -> ON {float(on):.2f} ({pct_text})"
 
 
 def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
@@ -20,6 +33,30 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
 
         notice = sub.add_parser("notice", help="Control concise reply notices.")
         notice.add_argument("state", choices=("on", "off"))
+
+        benchmark = sub.add_parser(
+            "benchmark",
+            help="Preview or explicitly run the controlled read-only OFF-vs-ON benchmark.",
+        )
+        benchmark.add_argument(
+            "--live",
+            action="store_true",
+            help="Actually run Hermes/OpenRouter benchmark turns. Without this flag only the plan is shown.",
+        )
+        benchmark.add_argument("--repeats", type=int, default=3)
+        benchmark.add_argument("--warmups", type=int, default=1)
+        benchmark.add_argument(
+            "--include-network",
+            action="store_true",
+            help="Include the optional public-web read-only fixture.",
+        )
+        benchmark.add_argument("--timeout", type=float, default=180.0)
+        benchmark.add_argument(
+            "--export",
+            type=str,
+            default=None,
+            help="Write anonymized benchmark JSON after a live run.",
+        )
 
     def handler(args: argparse.Namespace) -> int:
         action = str(getattr(args, "jev_action", "") or "status").lower()
@@ -37,8 +74,60 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             state = str(getattr(args, "state", "") or "").lower()
             print(set_notice(ctx, state == "on"))
             return 0
+        if action == "benchmark":
+            repeats = int(getattr(args, "repeats", 3))
+            warmups = int(getattr(args, "warmups", 1))
+            include_network = bool(getattr(args, "include_network", False))
+            plan = benchmark_plan_summary(
+                repeats=repeats,
+                warmups=warmups,
+                include_network=include_network,
+            )
+            if not bool(getattr(args, "live", False)):
+                print("Controlled Jev benchmark preview")
+                print(f"Fixtures: {plan['fixture_count']} ({', '.join(plan['fixtures'])})")
+                print(f"Warmups: {plan['warmups']} per fixture/mode")
+                print(f"Measured repeats: {plan['repeats']}")
+                print(f"Total Hermes turns: {plan['total_turns']}")
+                print(f"Measured turns: {plan['measured_turns']}")
+                print(f"Network fixture: {'included' if plan['network_included'] else 'excluded'}")
+                print("Order: paired alternating OFF/ON")
+                print("No benchmark was run. Add --live to execute paid/local Hermes turns.")
+                return 0
 
-        print("Usage: hermes jev {status|on|off|shadow|stats|notice}")
+            report = run_live_benchmark(
+                ctx,
+                telemetry,
+                repeats=repeats,
+                warmups=warmups,
+                include_network=include_network,
+                timeout_seconds=float(getattr(args, "timeout", 180.0)),
+            )
+            run = report["run"]
+            comparison = report["comparison"]
+            print(f"Benchmark run: {run['run_id']}")
+            print(f"Status: {run['status']}")
+            print(f"Matched pairs: {comparison['matched_pairs']}")
+            for key, label in (
+                ("hermes_duration_ms", "Hermes duration"),
+                ("tool_calls", "Tool calls"),
+                ("llm_requests", "LLM requests"),
+                ("total_tokens", "Total tokens"),
+            ):
+                print(f"{label}: {_fmt_delta(comparison['metrics'][key])}")
+
+            export_path = getattr(args, "export", None)
+            if export_path:
+                store = telemetry.stores.get()
+                written = write_anonymized_export(
+                    store,
+                    run["run_id"],
+                    Path(export_path),
+                )
+                print(f"Export: {written}")
+            return 0
+
+        print("Usage: hermes jev {status|on|off|shadow|stats|notice|benchmark}")
         return 2
 
     return setup, handler
