@@ -12,6 +12,8 @@ def tool(name):
 def request():
     return {
         "model": "codex-model",
+        "base_url": "https://provider.example/v1",
+        "api_mode": "codex_responses",
         "extra_headers": {"x-test": "keep"},
         "messages": [{"role": "user", "content": "search the web"}],
         "tools": [
@@ -87,10 +89,16 @@ class MiddlewareTests(unittest.TestCase):
         names = [item["name"] for item in updated["tools"]]
         self.assertEqual(
             names,
-            ["web_search", "clarify", "custom_future_tool"],
+            ["web_search", "tool_call", "clarify", "custom_future_tool"],
         )
         self.assertEqual(updated["model"], original["model"])
+        self.assertEqual(updated["base_url"], original["base_url"])
+        self.assertEqual(updated["api_mode"], original["api_mode"])
         self.assertEqual(updated["extra_headers"], original["extra_headers"])
+        self.assertEqual(
+            {key: value for key, value in updated.items() if key != "tools"},
+            {key: value for key, value in original.items() if key != "tools"},
+        )
         self.assertEqual(original["tools"][1]["name"], "terminal")
         self.assertEqual(result["source"], "hermes-jev-performance")
 
