@@ -40,7 +40,7 @@ class CommandTests(unittest.TestCase):
     def test_empty_command_is_status(self):
         result = handle_jev_command(FakeContext(), "")
         self.assertIn("Hermes Jev Performance", result)
-        self.assertIn("Phase: 6 (controls + telemetry)", result)
+        self.assertIn("Phase: 9 (hardening + packaging)", result)
         self.assertIn("Last route: none yet", result)
 
     def test_status_does_not_expose_unknown_settings_or_secrets(self):
@@ -110,6 +110,11 @@ class CommandTests(unittest.TestCase):
         ctx = FakeContext(set_config=False)
         result = handle_jev_command(ctx, "off")
         self.assertIn("could not be changed", result)
+
+    def test_doctor_command_is_safe(self):
+        result = handle_jev_command(FakeContext(), "doctor")
+        self.assertIn("Hermes Jev Performance doctor", result)
+        self.assertIn("Network calls: 0", result)
 
     def test_help(self):
         self.assertEqual(handle_jev_command(FakeContext(), "help"), USAGE)
