@@ -50,6 +50,7 @@ The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_
 /jev notice on
 /jev notice off
 /jev stats
+/jev doctor
 ```
 
 Equivalent CLI controls are provided where Hermes' public plugin APIs support them.
