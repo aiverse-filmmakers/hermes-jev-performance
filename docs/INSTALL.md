@@ -141,7 +141,7 @@ Repair affects only this plugin's local telemetry database. It does not touch He
 Remove the plugin through Hermes:
 
 ```bash
-heres plugins remove hermes-jev-performance
+hermes plugins remove hermes-jev-performance
 ```
 
 Hermes removes the installed plugin directory and its install metadata.
