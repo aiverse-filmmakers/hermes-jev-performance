@@ -41,7 +41,20 @@ class CommandTests(unittest.TestCase):
         result = handle_jev_command(FakeContext(), "")
         self.assertIn("Hermes Jev Performance", result)
         self.assertIn("Phase: 9 (hardening + packaging)", result)
-        self.assertIn("Last route: none yet", result)
+
+    def test_status_never_exposes_process_global_route_metadata(self):
+        class Middleware:
+            last_filter_reason = "filtered"
+            class Decision:
+                family = "private-family"
+                confidence = 0.99
+                reason = "accepted"
+            last_decision = Decision()
+
+        result = render_status(FakeContext(), Middleware())
+        self.assertNotIn("private-family", result)
+        self.assertNotIn("Last route", result)
+        self.assertNotIn("Last filter state", result)
 
     def test_status_does_not_expose_unknown_settings_or_secrets(self):
         ctx = FakeContext({
