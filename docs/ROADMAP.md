@@ -21,7 +21,7 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** a clean plugin that loads but does not yet call Jev.
 
-- [ ] 1.1 Create `plugin.yaml` with explicit manifest/version/license.
+- [x] 1.1 Create `plugin.yaml` with explicit manifest/version/license.
 - [ ] 1.2 Create minimal `register(ctx)` entry point.
 - [ ] 1.3 Add package/module layout.
 - [ ] 1.4 Add config validation and defaults.
