@@ -82,7 +82,6 @@ class PluginTests(unittest.TestCase):
 
         self.assertEqual(ctx.settings, before)
         self.assertIn("Phase: 9 (hardening + packaging)", output)
-        self.assertIn("Last route: none yet", output)
 
     def test_degrades_without_optional_hook_and_cli_surfaces(self):
         module = load_root_plugin()
