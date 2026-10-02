@@ -74,6 +74,72 @@ class StatsSummary:
     routes: tuple[tuple[str, int], ...]
 
 
+def inspect_database(path: Path | str | None = None) -> dict[str, Any]:
+    """Read-only SQLite health probe. Never creates or migrates the database."""
+    target = Path(path) if path is not None else default_db_path()
+    if not target.exists():
+        return {"state": "missing", "schema_version": None, "quick_check": None}
+    try:
+        uri = target.resolve().as_uri() + "?mode=ro"
+        con = sqlite3.connect(uri, uri=True, timeout=2.0)
+        try:
+            row = con.execute("PRAGMA quick_check").fetchone()
+            quick = str(row[0]) if row else "unknown"
+            schema_row = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()
+            version = int(schema_row[0]) if schema_row else 0
+        finally:
+            con.close()
+        return {
+            "state": "ready" if quick.lower() == "ok" else "corrupt",
+            "schema_version": version,
+            "quick_check": quick,
+        }
+    except Exception:
+        return {"state": "corrupt", "schema_version": None, "quick_check": None}
+
+
+def repair_corrupt_database(
+    path: Path | str | None = None,
+    *,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Explicitly quarantine an unreadable metrics DB and create a clean schema."""
+    target = Path(path) if path is not None else default_db_path()
+    health = inspect_database(target)
+    if health["state"] == "ready":
+        return {"repaired": False, "reason": "database_is_healthy", "backups": []}
+    if health["state"] == "missing":
+        MetricsStore(target).initialize()
+        return {"repaired": True, "reason": "created_missing_database", "backups": []}
+
+    stamp = time.strftime(
+        "%Y%m%dT%H%M%SZ",
+        time.gmtime(float(now if now is not None else time.time())),
+    )
+    backups: list[str] = []
+    target.parent.mkdir(parents=True, exist_ok=True)
+    for source in (
+        target,
+        Path(str(target) + "-wal"),
+        Path(str(target) + "-shm"),
+    ):
+        if not source.exists():
+            continue
+        destination = source.with_name(source.name + f".corrupt-{stamp}")
+        source.replace(destination)
+        backups.append(str(destination))
+
+    MetricsStore(target).initialize()
+    repaired_health = inspect_database(target)
+    return {
+        "repaired": repaired_health["state"] == "ready",
+        "reason": "quarantined_corrupt_database",
+        "backups": backups,
+    }
+
+
 class MetricsStore:
     """Small SQLite store. Opens short-lived connections for thread/process safety."""
 
