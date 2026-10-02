@@ -189,6 +189,79 @@ class StoreTests(unittest.TestCase):
         self.assertIn("route_reason", columns)
         self.assertEqual(version, "3")
 
+    def test_v2_database_migrates_to_v3(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = Path(temp.name) / "metrics.sqlite3"
+
+        with sqlite3.connect(path) as con:
+            con.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            con.execute(
+                "INSERT INTO meta(key, value) VALUES('schema_version', '2')"
+            )
+            con.execute(
+                """
+                CREATE TABLE hermes_turns (
+                    turn_key TEXT PRIMARY KEY,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    mode TEXT NOT NULL,
+                    route_family TEXT,
+                    route_applied INTEGER NOT NULL DEFAULT 0,
+                    duration_ms REAL,
+                    llm_requests INTEGER NOT NULL DEFAULT 0,
+                    tool_calls INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    route_reason TEXT
+                )
+                """
+            )
+
+        store = MetricsStore(path)
+        store.initialize()
+
+        with sqlite3.connect(path) as con:
+            columns = {
+                row[1] for row in con.execute("PRAGMA table_info(hermes_turns)")
+            }
+            tables = {
+                row[0]
+                for row in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+
+        self.assertEqual(version, "3")
+        self.assertIn("benchmark_run_id", columns)
+        self.assertIn("benchmark_sample_id", columns)
+        self.assertIn("benchmark_fixture_id", columns)
+        self.assertIn("benchmark_warmup", columns)
+        self.assertIn("benchmark_runs", tables)
+        self.assertIn("benchmark_samples", tables)
+
+    def test_schema_v3_initialize_is_idempotent(self):
+        store, path = self.make_store()
+        store.initialize()
+        store._initialized = False
+        store.initialize()
+        with sqlite3.connect(path) as con:
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+            indexes = {
+                row[1]
+                for row in con.execute("PRAGMA index_list(hermes_turns)")
+            }
+        self.assertEqual(version, "3")
+        self.assertIn("idx_hermes_turns_benchmark_run", indexes)
+
     def test_newer_schema_fails_closed_for_store_only(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
