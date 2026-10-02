@@ -1,0 +1,60 @@
+import importlib.util
+import pathlib
+import socket
+import unittest
+from unittest import mock
+
+from tests.fakes import FakeContext
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+def load_root_plugin():
+    spec = importlib.util.spec_from_file_location(
+        "hermes_jev_performance_plugin",
+        ROOT / "__init__.py",
+        submodule_search_locations=[str(ROOT)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+class PluginTests(unittest.TestCase):
+    def test_registers_only_jev_command_and_does_not_touch_network(self):
+        module = load_root_plugin()
+        ctx = FakeContext()
+
+        with mock.patch.object(
+            socket,
+            "socket",
+            side_effect=AssertionError("network access during Phase 1 registration"),
+        ):
+            module.register(ctx)
+
+        self.assertEqual(set(ctx.commands), {"jev"})
+        command = ctx.commands["jev"]
+        self.assertEqual(command["args_hint"], "[status|help]")
+        self.assertIn("routing/performance", command["description"])
+
+    def test_command_handler_is_read_only_and_network_free(self):
+        module = load_root_plugin()
+        ctx = FakeContext()
+        module.register(ctx)
+
+        before = dict(ctx.settings)
+        with mock.patch.object(
+            socket,
+            "socket",
+            side_effect=AssertionError("network access during Phase 1 status"),
+        ):
+            output = ctx.commands["jev"]["handler"]("status")
+
+        self.assertEqual(ctx.settings, before)
+        self.assertIn("Routing: not active yet", output)
+
+
+if __name__ == "__main__":
+    unittest.main()
