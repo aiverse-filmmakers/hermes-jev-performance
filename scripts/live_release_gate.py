@@ -14,10 +14,8 @@ import argparse
 from dataclasses import asdict, dataclass
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
-import sys
 import tempfile
 from typing import Callable, Sequence
 
@@ -161,7 +159,7 @@ def isolated_lifecycle_checks(
         env = _safe_env()
         env["HERMES_HOME"] = temp
 
-        steps = [
+        initial_steps = [
             (
                 "clean_install",
                 [
@@ -193,16 +191,9 @@ def isolated_lifecycle_checks(
                 "isolated disable failed",
                 180.0,
             ),
-            (
-                "enable",
-                ["hermes", "plugins", "enable", PLUGIN_ID],
-                "isolated re-enable passed",
-                "isolated re-enable failed",
-                180.0,
-            ),
         ]
 
-        for name, argv, ok_detail, bad_detail, timeout in steps:
+        for name, argv, ok_detail, bad_detail, timeout in initial_steps:
             result = _command_check(
                 name,
                 argv,
@@ -215,6 +206,49 @@ def isolated_lifecycle_checks(
             results.append(result)
             if result.status == "fail" and name == "clean_install":
                 return results
+
+        # A disabled plugin must not keep its custom CLI registration active.
+        try:
+            disabled_status = runner(
+                ["hermes", "jev", "status"],
+                env=env,
+                timeout=180.0,
+            )
+        except (OSError, subprocess.SubprocessError):
+            results.append(
+                GateResult("disabled_registration_absent", "pass", "Jev CLI absent while plugin disabled")
+            )
+        else:
+            results.append(
+                _result(
+                    "disabled_registration_absent",
+                    disabled_status.returncode != 0,
+                    "Jev CLI absent while plugin disabled"
+                    if disabled_status.returncode != 0
+                    else "Jev CLI remained active after plugin disable",
+                )
+            )
+
+        results.append(
+            _command_check(
+                "enable",
+                ["hermes", "plugins", "enable", PLUGIN_ID],
+                runner=runner,
+                env=env,
+                success_detail="isolated re-enable passed",
+                failure_detail="isolated re-enable failed",
+            )
+        )
+        results.append(
+            _command_check(
+                "post_enable_status",
+                ["hermes", "jev", "status"],
+                runner=runner,
+                env=env,
+                success_detail="Jev CLI restored after re-enable",
+                failure_detail="Jev CLI unavailable after re-enable",
+            )
+        )
 
         # Mode persistence is tested only inside the isolated profile.
         for mode in ("off", "shadow", "on", "shadow"):
@@ -272,12 +306,12 @@ def live_jev_smoke(
 ) -> GateResult:
     return _command_check(
         "live_openrouter_jev",
-        [sys.executable, "-m", "jevperf.smoke"],
+        ["hermes", "jev", "smoke"],
         runner=runner,
         env=_safe_env(),
         timeout=60.0,
-        success_detail="explicit OpenRouter Jev smoke call passed",
-        failure_detail="explicit OpenRouter Jev smoke call failed",
+        success_detail="explicit profile-scoped OpenRouter Jev smoke call passed",
+        failure_detail="explicit profile-scoped OpenRouter Jev smoke call failed",
     )
 
 
@@ -388,7 +422,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--live-jev",
         action="store_true",
-        help="Make one explicit OpenRouter Jev smoke call. May incur provider cost.",
+        help="Make one explicit profile-scoped OpenRouter Jev smoke call. May incur provider cost.",
     )
     parser.add_argument(
         "--active-agent",
