@@ -142,14 +142,14 @@ Every phase has an explicit gate. Do not start a later phase by silently bypassi
 
 **Goal:** distinguish actual causal benchmark results from ordinary usage correlations.
 
-- [ ] 8.1 Define synthetic/mocked CI benchmark fixtures.
-- [ ] 8.2 Define optional local read-only end-to-end benchmark suite.
-- [ ] 8.3 Run matched workloads OFF then ON with warm-up rules.
-- [ ] 8.4 Record environment/version metadata without personal identifiers.
-- [ ] 8.5 Calculate duration/tool/LLM/token deltas.
-- [ ] 8.6 Separate benchmark records from observational records.
-- [ ] 8.7 Render benchmark results in dashboard.
-- [ ] 8.8 Add export of anonymized benchmark JSON.
+- [x] 8.1 Define synthetic/mocked CI benchmark fixtures.
+- [x] 8.2 Define optional local read-only end-to-end benchmark suite.
+- [x] 8.3 Run matched workloads OFF then ON with warm-up rules.
+- [x] 8.4 Record environment/version metadata without personal identifiers.
+- [x] 8.5 Calculate duration/tool/LLM/token deltas.
+- [x] 8.6 Separate benchmark records from observational records.
+- [x] 8.7 Render benchmark results in dashboard.
+- [x] 8.8 Add export of anonymized benchmark JSON.
 
 **Gate P8:** benchmark can be reproduced and does not make unsupported causal claims.
 
