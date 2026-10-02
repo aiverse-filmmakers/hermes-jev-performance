@@ -59,6 +59,44 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(check["status"], "warn")
         self.assertIn("fail open", check["detail"])
 
+    def test_version_below_declared_floor_is_failure(self):
+        with mock.patch(
+            "jevperf.compatibility.detect_hermes_version",
+            return_value="0.21.4",
+        ), mock.patch(
+            "jevperf.doctor.detect_hermes_version",
+            return_value="0.21.4",
+        ):
+            report = run_doctor(
+                FakeContext(),
+                plugin_root=ROOT,
+                db_path=self.make_db_path(),
+                secret_reader=self.secret_reader,
+            )
+        by_name = {row["name"]: row for row in report["checks"]}
+        self.assertEqual(report["overall"], "fail")
+        self.assertEqual(by_name["hermes_plugin_api"]["status"], "fail")
+        self.assertEqual(by_name["hermes_version"]["status"], "fail")
+        self.assertIn("below required 0.21.5", by_name["hermes_version"]["detail"])
+
+    def test_unparseable_version_is_warning_not_false_pass(self):
+        with mock.patch(
+            "jevperf.compatibility.detect_hermes_version",
+            return_value="development",
+        ), mock.patch(
+            "jevperf.doctor.detect_hermes_version",
+            return_value="development",
+        ):
+            report = run_doctor(
+                FakeContext(),
+                plugin_root=ROOT,
+                db_path=self.make_db_path(),
+                secret_reader=self.secret_reader,
+            )
+        check = next(row for row in report["checks"] if row["name"] == "hermes_version")
+        self.assertEqual(check["status"], "warn")
+        self.assertIn("unable to parse", check["detail"])
+
     def test_corrupt_database_is_detected_without_automatic_mutation(self):
         path = self.make_db_path()
         path.write_bytes(b"not a sqlite database")
