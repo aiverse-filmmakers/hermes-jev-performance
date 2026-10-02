@@ -420,3 +420,19 @@ A corrupt metrics database never causes automatic deletion. Routing remains inde
 ### 17.3 Repository gate
 
 CI runs a conservative public-repository scanner before unit tests. It reports only rule identifiers and file paths, not matched secret values.
+
+
+## 18. Deferred-tool bridge preservation
+
+Hermes may replace MCP, non-core plugin, and explicitly deferred built-in tool schemas with the `tool_search`, `tool_describe`, and `tool_call` bridge.
+
+The public `llm_request` middleware receives the already assembled model-facing request. It can remove eager schemas, but it does not own the session's pre-assembly deferred catalog used to validate `tool_call`.
+
+Therefore ON-mode routing:
+
+- removes known competing eager tool schemas;
+- preserves unknown/custom tools;
+- preserves `clarify` and `delegate_task`;
+- preserves the Hermes deferred-tool bridge for every family.
+
+This means Jev routing is intentionally **not** a security or authorization boundary. Normal Hermes tool permissions, approvals, session toolset scope, and Tool Search validation remain authoritative.
