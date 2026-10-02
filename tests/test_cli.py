@@ -70,6 +70,28 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Hermes Jev Performance", output)
 
+    def test_cli_smoke_uses_explicit_live_smoke_helper(self):
+        payload = {
+            "ok": True,
+            "credential_source": "OPENROUTER_JEV_API_TOKEN",
+            "choice": "web",
+        }
+        with mock.patch("jevperf.cli.run_smoke", return_value=(0, payload)) as smoke:
+            code, output, _, _ = self.parse_and_run(["smoke"])
+        self.assertEqual(code, 0)
+        smoke.assert_called_once_with()
+        self.assertIn('"ok": true', output)
+        self.assertNotIn("fixture-token", output)
+
+    def test_cli_smoke_propagates_safe_failure_code(self):
+        with mock.patch(
+            "jevperf.cli.run_smoke",
+            return_value=(2, {"ok": False, "error": "missing_credential"}),
+        ):
+            code, output, _, _ = self.parse_and_run(["smoke"])
+        self.assertEqual(code, 2)
+        self.assertIn("missing_credential", output)
+
     def test_benchmark_preview_never_runs_live_harness(self):
         with mock.patch(
             "jevperf.cli.run_live_benchmark",
@@ -86,6 +108,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("Controlled Jev benchmark preview", output)
         self.assertIn("No benchmark was run", output)
         self.assertIn("Measured repeats: 2", output)
+
     def test_cli_doctor_renders_safe_report(self):
         report = {
             "plugin": "hermes-jev-performance",
@@ -118,6 +141,7 @@ class CliTests(unittest.TestCase):
             code, output, _, _ = self.parse_and_run(["doctor", "--json"])
         self.assertEqual(code, 0)
         self.assertIn('"overall": "warn"', output)
+
 
 if __name__ == "__main__":
     unittest.main()
