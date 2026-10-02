@@ -28,6 +28,18 @@ class CompatibilityMatrixTests(unittest.TestCase):
         self.assertTrue(result["persistent_settings_ready"])
         self.assertTrue(result["version_meets_floor"])
 
+    def test_below_declared_floor_is_unsupported(self):
+        with mock.patch("jevperf.compatibility.detect_hermes_version", return_value="0.21.4"):
+            result = detect_compatibility(FakeContext())
+        self.assertEqual(result["level"], "unsupported")
+        self.assertFalse(result["version_meets_floor"])
+
+    def test_unknown_version_uses_feature_detection(self):
+        with mock.patch("jevperf.compatibility.detect_hermes_version", return_value=None):
+            result = detect_compatibility(FakeContext())
+        self.assertEqual(result["level"], "supported")
+        self.assertIsNone(result["version_meets_floor"])
+
     def test_missing_optional_cli_surface_is_still_supported_for_runtime(self):
         with mock.patch("jevperf.compatibility.detect_hermes_version", return_value="0.21.5"):
             result = detect_compatibility(FakeContext(cli=False))
