@@ -65,6 +65,13 @@ hermes jev benchmark --live --export ./benchmark.json
 
 The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default suite is read-only and network-free.
 
+Diagnostics:
+
+```text
+hermes jev doctor
+hermes jev doctor --json
+```
+
 ## Routing families
 
 The initial routing taxonomy is:
