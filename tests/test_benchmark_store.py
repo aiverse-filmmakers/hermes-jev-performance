@@ -249,7 +249,7 @@ class BenchmarkStoreTests(unittest.TestCase):
         self.assertFalse(payload["privacy"]["prompt_text_included"])
         self.assertFalse(payload["privacy"]["host_identifiers_included"])
 
-    def test_schema_v3_has_benchmark_tables_without_content_columns(self):
+    def test_schema_v4_has_benchmark_tables_without_content_columns(self):
         store, path = self.make_store()
         store.initialize()
         forbidden = {
