@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import os
@@ -88,6 +89,15 @@ class MetricsStore:
         connection.execute("PRAGMA journal_mode = WAL")
         connection.execute("PRAGMA synchronous = NORMAL")
         return connection
+
+    @contextmanager
+    def _connection(self):
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _schema_version(self, con: sqlite3.Connection) -> int:
         con.execute(
@@ -191,7 +201,7 @@ class MetricsStore:
         with self._init_lock:
             if self._initialized:
                 return
-            with self._connect() as con:
+            with self._connection() as con:
                 version = self._schema_version(con)
                 if version > SCHEMA_VERSION:
                     raise StoreSchemaError(
@@ -209,7 +219,7 @@ class MetricsStore:
     def touch_turn(self, turn_key: str, mode: str, *, now: float | None = None) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT OR IGNORE INTO hermes_turns(turn_key, started_at, mode)
@@ -230,7 +240,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT OR IGNORE INTO jev_decisions(
@@ -275,7 +285,7 @@ class MetricsStore:
 
     def record_turn_reason(self, turn_key: str, reason: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET route_reason = ? WHERE turn_key = ?",
                 (str(reason or "unknown"), turn_key),
@@ -283,7 +293,7 @@ class MetricsStore:
 
     def increment_llm_request(self, turn_key: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET llm_requests = llm_requests + 1 WHERE turn_key = ?",
                 (turn_key,),
@@ -328,7 +338,7 @@ class MetricsStore:
             return
 
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 UPDATE hermes_turns
@@ -343,7 +353,7 @@ class MetricsStore:
 
     def increment_tool_call(self, turn_key: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET tool_calls = tool_calls + 1 WHERE turn_key = ?",
                 (turn_key,),
@@ -358,7 +368,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             row = con.execute(
                 "SELECT started_at FROM hermes_turns WHERE turn_key = ?",
                 (turn_key,),
@@ -385,7 +395,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT INTO mode_changes(created_at, old_mode, new_mode, source)
@@ -398,7 +408,7 @@ class MetricsStore:
         self.initialize()
         days = max(1, int(retention_days))
         cutoff = float(now if now is not None else time.time()) - (days * 86400)
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute("DELETE FROM jev_decisions WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM hermes_turns WHERE started_at < ?", (cutoff,))
             con.execute("DELETE FROM mode_changes WHERE created_at < ?", (cutoff,))
@@ -408,7 +418,7 @@ class MetricsStore:
         hours = max(1, min(int(since_hours), 24 * 3650))
         cutoff = float(now if now is not None else time.time()) - (hours * 3600)
 
-        with self._connect() as con:
+        with self._connection() as con:
             decisions = con.execute(
                 """
                 SELECT
