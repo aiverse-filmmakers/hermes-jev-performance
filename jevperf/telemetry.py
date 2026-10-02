@@ -138,9 +138,18 @@ class TelemetryObserver:
         key = turn_key(kwargs.get("session_id"), kwargs.get("turn_id"))
         if key is None or not read_config(self.ctx).telemetry_enabled:
             return
+        store = self.stores.get()
+        _safe_call(
+            store.record_runtime_identity,
+            key,
+            provider=kwargs.get("provider"),
+            requested_model=kwargs.get("model"),
+            response_model=kwargs.get("response_model"),
+            api_mode=kwargs.get("api_mode"),
+        )
         usage = kwargs.get("usage")
         _safe_call(
-            self.stores.get().add_usage,
+            store.add_usage,
             key,
             usage if isinstance(usage, dict) else None,
         )
