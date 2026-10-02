@@ -23,6 +23,9 @@ class FakeTelemetry:
             fallback = 0
             avg_confidence = None
             avg_jev_latency_ms = None
+            p50_jev_latency_ms = None
+            p95_jev_latency_ms = None
+            avg_jev_cost_usd = None
             total_jev_cost_usd = None
             avg_turn_duration_ms = None
             avg_tool_calls = None
