@@ -20,7 +20,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Compile
-        run: python -m compileall -q __init__.py jevperf tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Compile Python
+        run: python -m compileall -q __init__.py jevperf dashboard tests
+      - name: Check dashboard JavaScript
+        run: node --check dashboard/dist/index.js
       - name: Unit tests
         run: python -m unittest discover -s tests -v

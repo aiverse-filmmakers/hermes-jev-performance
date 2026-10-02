@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import os
@@ -88,6 +89,15 @@ class MetricsStore:
         connection.execute("PRAGMA journal_mode = WAL")
         connection.execute("PRAGMA synchronous = NORMAL")
         return connection
+
+    @contextmanager
+    def _connection(self):
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _schema_version(self, con: sqlite3.Connection) -> int:
         con.execute(
@@ -191,7 +201,7 @@ class MetricsStore:
         with self._init_lock:
             if self._initialized:
                 return
-            with self._connect() as con:
+            with self._connection() as con:
                 version = self._schema_version(con)
                 if version > SCHEMA_VERSION:
                     raise StoreSchemaError(
@@ -209,7 +219,7 @@ class MetricsStore:
     def touch_turn(self, turn_key: str, mode: str, *, now: float | None = None) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT OR IGNORE INTO hermes_turns(turn_key, started_at, mode)
@@ -230,7 +240,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT OR IGNORE INTO jev_decisions(
@@ -275,7 +285,7 @@ class MetricsStore:
 
     def record_turn_reason(self, turn_key: str, reason: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET route_reason = ? WHERE turn_key = ?",
                 (str(reason or "unknown"), turn_key),
@@ -283,7 +293,7 @@ class MetricsStore:
 
     def increment_llm_request(self, turn_key: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET llm_requests = llm_requests + 1 WHERE turn_key = ?",
                 (turn_key,),
@@ -328,7 +338,7 @@ class MetricsStore:
             return
 
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 UPDATE hermes_turns
@@ -343,7 +353,7 @@ class MetricsStore:
 
     def increment_tool_call(self, turn_key: str) -> None:
         self.initialize()
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 "UPDATE hermes_turns SET tool_calls = tool_calls + 1 WHERE turn_key = ?",
                 (turn_key,),
@@ -358,7 +368,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             row = con.execute(
                 "SELECT started_at FROM hermes_turns WHERE turn_key = ?",
                 (turn_key,),
@@ -385,7 +395,7 @@ class MetricsStore:
     ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute(
                 """
                 INSERT INTO mode_changes(created_at, old_mode, new_mode, source)
@@ -398,7 +408,7 @@ class MetricsStore:
         self.initialize()
         days = max(1, int(retention_days))
         cutoff = float(now if now is not None else time.time()) - (days * 86400)
-        with self._connect() as con:
+        with self._connection() as con:
             con.execute("DELETE FROM jev_decisions WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM hermes_turns WHERE started_at < ?", (cutoff,))
             con.execute("DELETE FROM mode_changes WHERE created_at < ?", (cutoff,))
@@ -408,7 +418,7 @@ class MetricsStore:
         hours = max(1, min(int(since_hours), 24 * 3650))
         cutoff = float(now if now is not None else time.time()) - (hours * 3600)
 
-        with self._connect() as con:
+        with self._connection() as con:
             decisions = con.execute(
                 """
                 SELECT
@@ -467,6 +477,207 @@ class MetricsStore:
             output_tokens=_integer(turns["output_tokens"]),
             routes=tuple((str(row["family"]), int(row["count"])) for row in routes),
         )
+
+
+    def recent_decisions(
+        self,
+        *,
+        since_hours: int = 24,
+        limit: int = 30,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        self.initialize()
+        hours = max(1, min(int(since_hours), 24 * 3650))
+        row_limit = max(1, min(int(limit), 200))
+        cutoff = float(now if now is not None else time.time()) - (hours * 3600)
+        with self._connection() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    created_at, mode, provider, requested_model, actual_model,
+                    family, confidence, latency_ms, cost_usd,
+                    input_tokens, output_tokens, accepted, applied, reason,
+                    error_category, error_status_code
+                FROM jev_decisions
+                WHERE created_at >= ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (cutoff, row_limit),
+            ).fetchall()
+        return [
+            {
+                "created_at": float(row["created_at"]),
+                "mode": str(row["mode"]),
+                "provider": row["provider"],
+                "requested_model": row["requested_model"],
+                "actual_model": row["actual_model"],
+                "family": row["family"],
+                "confidence": _number(row["confidence"]),
+                "latency_ms": _number(row["latency_ms"]),
+                "cost_usd": _number(row["cost_usd"]),
+                "input_tokens": _integer(row["input_tokens"]),
+                "output_tokens": _integer(row["output_tokens"]),
+                "accepted": bool(row["accepted"]),
+                "applied": bool(row["applied"]),
+                "reason": str(row["reason"] or "unknown"),
+                "error_category": row["error_category"],
+                "error_status_code": row["error_status_code"],
+            }
+            for row in rows
+        ]
+
+    def reason_breakdown(
+        self,
+        *,
+        since_hours: int = 24,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        self.initialize()
+        hours = max(1, min(int(since_hours), 24 * 3650))
+        cutoff = float(now if now is not None else time.time()) - (hours * 3600)
+        with self._connection() as con:
+            rows = con.execute(
+                """
+                SELECT COALESCE(route_reason, 'unknown') AS reason, COUNT(*) AS count
+                FROM hermes_turns
+                WHERE started_at >= ?
+                GROUP BY COALESCE(route_reason, 'unknown')
+                ORDER BY count DESC, reason ASC
+                """,
+                (cutoff,),
+            ).fetchall()
+        return [
+            {"reason": str(row["reason"]), "count": int(row["count"])}
+            for row in rows
+        ]
+
+    def mode_comparison(
+        self,
+        *,
+        since_hours: int = 24,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        self.initialize()
+        hours = max(1, min(int(since_hours), 24 * 3650))
+        cutoff = float(now if now is not None else time.time()) - (hours * 3600)
+
+        with self._connection() as con:
+            turn_rows = con.execute(
+                """
+                SELECT
+                    mode,
+                    COUNT(*) AS turns,
+                    SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS completed,
+                    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors,
+                    AVG(duration_ms) AS avg_duration_ms,
+                    AVG(tool_calls) AS avg_tool_calls,
+                    AVG(llm_requests) AS avg_llm_requests,
+                    AVG(input_tokens) AS avg_input_tokens,
+                    AVG(cached_input_tokens) AS avg_cached_input_tokens,
+                    AVG(output_tokens) AS avg_output_tokens,
+                    AVG(reasoning_tokens) AS avg_reasoning_tokens
+                FROM hermes_turns
+                WHERE started_at >= ?
+                GROUP BY mode
+                """,
+                (cutoff,),
+            ).fetchall()
+            decision_rows = con.execute(
+                """
+                SELECT
+                    mode,
+                    COUNT(*) AS decisions,
+                    COALESCE(SUM(applied), 0) AS applied,
+                    AVG(latency_ms) AS avg_jev_latency_ms,
+                    AVG(confidence) AS avg_jev_confidence,
+                    SUM(cost_usd) AS total_jev_cost_usd
+                FROM jev_decisions
+                WHERE created_at >= ?
+                GROUP BY mode
+                """,
+                (cutoff,),
+            ).fetchall()
+
+        turns_by_mode = {str(row["mode"]): row for row in turn_rows}
+        decisions_by_mode = {str(row["mode"]): row for row in decision_rows}
+        result: list[dict[str, Any]] = []
+
+        for mode in ("off", "shadow", "on"):
+            turns = turns_by_mode.get(mode)
+            decisions = decisions_by_mode.get(mode)
+            result.append(
+                {
+                    "mode": mode,
+                    "turns": int(turns["turns"] or 0) if turns is not None else 0,
+                    "completed": int(turns["completed"] or 0) if turns is not None else 0,
+                    "errors": int(turns["errors"] or 0) if turns is not None else 0,
+                    "avg_duration_ms": _number(turns["avg_duration_ms"]) if turns is not None else None,
+                    "avg_tool_calls": _number(turns["avg_tool_calls"]) if turns is not None else None,
+                    "avg_llm_requests": _number(turns["avg_llm_requests"]) if turns is not None else None,
+                    "avg_input_tokens": _number(turns["avg_input_tokens"]) if turns is not None else None,
+                    "avg_cached_input_tokens": _number(turns["avg_cached_input_tokens"]) if turns is not None else None,
+                    "avg_output_tokens": _number(turns["avg_output_tokens"]) if turns is not None else None,
+                    "avg_reasoning_tokens": _number(turns["avg_reasoning_tokens"]) if turns is not None else None,
+                    "decisions": int(decisions["decisions"] or 0) if decisions is not None else 0,
+                    "applied": int(decisions["applied"] or 0) if decisions is not None else 0,
+                    "avg_jev_latency_ms": _number(decisions["avg_jev_latency_ms"]) if decisions is not None else None,
+                    "avg_jev_confidence": _number(decisions["avg_jev_confidence"]) if decisions is not None else None,
+                    "total_jev_cost_usd": _number(decisions["total_jev_cost_usd"]) if decisions is not None else None,
+                }
+            )
+        return result
+
+    def time_series(
+        self,
+        *,
+        since_hours: int = 24,
+        points: int = 36,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        self.initialize()
+        hours = max(1, min(int(since_hours), 24 * 3650))
+        point_count = max(6, min(int(points), 120))
+        end = float(now if now is not None else time.time())
+        cutoff = end - (hours * 3600)
+        bucket_seconds = max(60, int((hours * 3600 + point_count - 1) // point_count))
+
+        with self._connection() as con:
+            rows = con.execute(
+                """
+                SELECT
+                    CAST((started_at - ?) / ? AS INTEGER) AS bucket,
+                    COUNT(*) AS turns,
+                    AVG(duration_ms) AS avg_duration_ms,
+                    AVG(tool_calls) AS avg_tool_calls,
+                    AVG(llm_requests) AS avg_llm_requests,
+                    SUM(input_tokens) AS input_tokens,
+                    SUM(cached_input_tokens) AS cached_input_tokens,
+                    SUM(output_tokens) AS output_tokens,
+                    SUM(reasoning_tokens) AS reasoning_tokens
+                FROM hermes_turns
+                WHERE started_at >= ? AND started_at <= ?
+                GROUP BY bucket
+                ORDER BY bucket ASC
+                """,
+                (cutoff, bucket_seconds, cutoff, end),
+            ).fetchall()
+
+        return [
+            {
+                "started_at": cutoff + (int(row["bucket"]) * bucket_seconds),
+                "bucket_seconds": bucket_seconds,
+                "turns": int(row["turns"] or 0),
+                "avg_duration_ms": _number(row["avg_duration_ms"]),
+                "avg_tool_calls": _number(row["avg_tool_calls"]),
+                "avg_llm_requests": _number(row["avg_llm_requests"]),
+                "input_tokens": _integer(row["input_tokens"]),
+                "cached_input_tokens": _integer(row["cached_input_tokens"]),
+                "output_tokens": _integer(row["output_tokens"]),
+                "reasoning_tokens": _integer(row["reasoning_tokens"]),
+            }
+            for row in rows
+        ]
 
 
 class StoreProvider:
