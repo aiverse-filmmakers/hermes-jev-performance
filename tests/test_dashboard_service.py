@@ -1,4 +1,5 @@
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -56,7 +57,8 @@ class DashboardServiceTests(unittest.TestCase):
     def test_status_contains_safe_runtime_fields_and_24h_summary(self):
         settings = SettingsHarness(mode="shadow")
         store = self.make_store()
-        store.touch_turn("opaque", "shadow", now=100)
+        now = time.time()
+        store.touch_turn("opaque", "shadow", now=now)
         store.record_decision(
             turn_key="opaque",
             mode="shadow",
@@ -70,7 +72,7 @@ class DashboardServiceTests(unittest.TestCase):
             ),
             applied=False,
             reason="shadow",
-            now=100.1,
+            now=now + 0.1,
         )
         payload = status_payload(field_loader=settings.loader, store=store)
         self.assertEqual(payload["mode"], "shadow")
@@ -82,7 +84,8 @@ class DashboardServiceTests(unittest.TestCase):
 
     def test_summary_is_aggregate_only(self):
         store = self.make_store()
-        store.touch_turn("opaque", "on", now=100)
+        now = time.time()
+        store.touch_turn("opaque", "on", now=now)
         store.record_decision(
             turn_key="opaque",
             mode="on",
