@@ -1,6 +1,5 @@
 import json
 import socket
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -114,9 +113,14 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(check["status"], "fail")
         self.assertEqual(path.read_bytes(), before)
 
-    def test_explicit_corrupt_database_repair_quarantines_old_file(self):
+    def test_explicit_corrupt_database_repair_quarantines_main_wal_and_shm(self):
         path = self.make_db_path()
         path.write_bytes(b"not a sqlite database")
+        wal = Path(str(path) + "-wal")
+        shm = Path(str(path) + "-shm")
+        wal.write_bytes(b"old wal bytes")
+        shm.write_bytes(b"old shm bytes")
+
         report = run_doctor(
             FakeContext(),
             plugin_root=ROOT,
@@ -130,9 +134,16 @@ class DoctorTests(unittest.TestCase):
         )
         self.assertEqual(check["status"], "pass")
         self.assertEqual(inspect_database(path)["state"], "ready")
-        backups = list(path.parent.glob("metrics.sqlite3.corrupt-*"))
-        self.assertEqual(len(backups), 1)
-        self.assertEqual(backups[0].read_bytes(), b"not a sqlite database")
+
+        main_backups = list(path.parent.glob("metrics.sqlite3.corrupt-*"))
+        wal_backups = list(path.parent.glob("metrics.sqlite3-wal.corrupt-*"))
+        shm_backups = list(path.parent.glob("metrics.sqlite3-shm.corrupt-*"))
+        self.assertEqual(len(main_backups), 1)
+        self.assertEqual(len(wal_backups), 1)
+        self.assertEqual(len(shm_backups), 1)
+        self.assertEqual(main_backups[0].read_bytes(), b"not a sqlite database")
+        self.assertEqual(wal_backups[0].read_bytes(), b"old wal bytes")
+        self.assertEqual(shm_backups[0].read_bytes(), b"old shm bytes")
 
     def test_repair_function_does_not_replace_healthy_database(self):
         path = self.make_db_path()
