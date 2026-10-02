@@ -91,7 +91,7 @@ hermes plugins doctor hermes-jev-performance --ci
 hermes jev doctor
 ```
 
-Telemetry schema upgrades are forward migrations. Current schema is v3.
+Telemetry schema upgrades are forward migrations. Current schema is v4.
 
 ## Roll back
 
