@@ -86,6 +86,8 @@ multi
 ## Documentation
 
 - [Source of truth](docs/SOURCE_OF_TRUTH.md)
+- [Install, upgrade and uninstall](docs/INSTALL.md)
+- [Compatibility matrix](docs/COMPATIBILITY.md)
 - [Product requirements](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation roadmap](docs/ROADMAP.md)
