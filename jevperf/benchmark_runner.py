@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 import re
@@ -22,6 +23,7 @@ from .benchmark import (
 )
 from .benchmark_context import BenchmarkContext, benchmark_env
 from .config import read_config
+from .credentials import resolve_openrouter_credential
 from .store import MetricsStore, default_db_path
 
 
@@ -81,6 +83,17 @@ def _final_report(store: MetricsStore, run_id: str) -> dict[str, Any]:
     }
 
 
+def _routing_valid(sample: Any, row: dict[str, Any]) -> bool:
+    if sample.mode == "off":
+        return True
+    expected = sample.family
+    actual = str(row.get("route_family") or "")
+    applied = row.get("route_applied") is True
+    if expected in {"none", "multi"}:
+        return actual == expected and not applied
+    return actual == expected and applied
+
+
 def run_live_benchmark(
     ctx: Any,
     telemetry: Any,
@@ -95,10 +108,32 @@ def run_live_benchmark(
     """Run explicit paid/local benchmark turns with process-scoped OFF/ON modes.
 
     The user's persistent Jev mode is never changed by the benchmark runner.
+    The runner refuses to spend model/provider calls unless telemetry is enabled
+    and a usable Jev credential is present, because otherwise ON results cannot
+    be validated as actual routing samples.
     """
     hermes_executable = executable or shutil.which("hermes")
     if not hermes_executable:
         raise RuntimeError("Hermes executable not found on PATH")
+
+    try:
+        timeout_seconds = float(timeout_seconds)
+    except (TypeError, ValueError):
+        raise ValueError("timeout_seconds must be a number") from None
+    if not math.isfinite(timeout_seconds) or not 10.0 <= timeout_seconds <= 3600.0:
+        raise ValueError("timeout_seconds must be between 10 and 3600 seconds")
+
+    config = read_config(ctx)
+    if not config.telemetry_enabled:
+        raise RuntimeError(
+            "controlled benchmark requires telemetry_enabled=true so matched turns can be measured"
+        )
+    if config.provider != "openrouter":
+        raise RuntimeError("controlled benchmark v1 requires the OpenRouter Jev provider")
+    if resolve_openrouter_credential() is None:
+        raise RuntimeError(
+            "controlled benchmark requires an OpenRouter Jev credential before any live turns run"
+        )
 
     fixtures = load_fixture_suite(
         fixture_path,
@@ -106,7 +141,6 @@ def run_live_benchmark(
     )
     plan = build_plan(fixtures, repeats=repeats, warmups=warmups)
     run_id = plan[0].run_id
-    config = read_config(ctx)
     store = _store_from_telemetry(telemetry)
     fixture_hash = fixture_set_hash(fixtures)
 
@@ -126,9 +160,10 @@ def run_live_benchmark(
         "fixture_order": "stable",
         "read_only_default": True,
         "public_web_fixture_included": bool(include_network),
-        "timeout_seconds": float(timeout_seconds),
+        "timeout_seconds": timeout_seconds,
         "sample_count": len(plan),
         "measured_sample_count": sum(1 for sample in plan if not sample.is_warmup),
+        "on_samples_require_expected_route": True,
     }
 
     store.start_benchmark_run(
@@ -190,7 +225,7 @@ def run_live_benchmark(
                     env=env,
                     capture_output=True,
                     text=True,
-                    timeout=max(10.0, float(timeout_seconds)),
+                    timeout=timeout_seconds,
                     check=False,
                 )
                 exit_code = int(completed.returncode)
@@ -212,7 +247,7 @@ def run_live_benchmark(
                 validation_passed=validation_passed,
                 error_category=error_category,
             )
-            if not sample.is_warmup and row.get("status") != "complete":
+            if row.get("status") != "complete" or not _routing_valid(sample, row):
                 run_status = "complete_with_failures"
     except Exception:
         run_status = "runner_error"
