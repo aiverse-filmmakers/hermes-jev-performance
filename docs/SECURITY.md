@@ -101,3 +101,33 @@ Debug content logging, if ever introduced, must be explicit opt-in, local, time-
 ## 10. Public repository policy
 
 This repository must remain safe to make public at all times. Synthetic fixtures only. See `SOURCE_OF_TRUTH.md` public-repository hygiene.
+
+
+## 11. Telemetry corruption and recovery
+
+Telemetry is not allowed to become an agent availability dependency.
+
+If the SQLite metrics store is unreadable or corrupt:
+
+- routing/agent execution continues through existing fail-open boundaries;
+- dashboard telemetry may report degraded/unavailable;
+- the plugin does not silently delete or replace the database;
+- `hermes jev doctor` reports the local failure without exposing paths in dashboard payloads;
+- explicit `hermes jev doctor --repair-db` may quarantine the corrupt database and create a clean schema.
+
+Repair is limited to this plugin's local metrics files. It does not modify Hermes conversations, provider credentials, config, or other plugins.
+
+## 12. Public repository CI scan
+
+CI runs `scripts/public_repo_scan.py` on every supported Python matrix job.
+
+The scan blocks known high-risk public-repository patterns including:
+
+- private-key material;
+- OpenRouter/GitHub/Slack/Telegram token shapes;
+- non-placeholder credential assignments;
+- absolute `/home/<user>/...` paths.
+
+The scanner prints only the file and rule identifier, never the matched value.
+
+This scanner supplements, rather than replaces, manual release review and GitHub's own repository security controls.
