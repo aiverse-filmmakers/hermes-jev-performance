@@ -33,23 +33,20 @@ class RoutingMiddleware:
         key: str,
         config: Any,
     ) -> RoutingDecision | None:
-        cached = self.cache.get(key)
-        if isinstance(cached, RoutingDecision):
-            return cached
+        def compute() -> RoutingDecision | None:
+            state = extract_routing_state(request)
+            if not state:
+                return None
+            return self.router.decide(
+                state,
+                provider=config.provider,
+                model=config.model,
+                timeout_seconds=config.timeout_seconds,
+                min_confidence=config.min_confidence,
+            )
 
-        state = extract_routing_state(request)
-        if not state:
-            return None
-
-        decision = self.router.decide(
-            state,
-            provider=config.provider,
-            model=config.model,
-            timeout_seconds=config.timeout_seconds,
-            min_confidence=config.min_confidence,
-        )
-        self.cache.put(key, decision)
-        return decision
+        decision = self.cache.get_or_compute(key, compute)
+        return decision if isinstance(decision, RoutingDecision) else None
 
     def __call__(self, **kwargs: Any) -> dict[str, Any] | None:
         """Return a complete replacement request only when ON mode safely filters."""
@@ -83,7 +80,10 @@ class RoutingMiddleware:
                 return None
 
             if not decision.can_filter:
-                self.last_filter_reason = decision.reason
+                if decision.accepted and decision.family in {"none", "multi"}:
+                    self.last_filter_reason = f"unrestricted_{decision.family}"
+                else:
+                    self.last_filter_reason = decision.reason
                 return None
 
             tools = request.get("tools")
