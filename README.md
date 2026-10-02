@@ -63,7 +63,7 @@ hermes jev benchmark --live
 hermes jev benchmark --live --export ./benchmark.json
 ```
 
-The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default suite is read-only and network-free.
+The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default workload fixtures are read-only and exclude public-web research. A live run still uses the configured Hermes model/provider, and ON samples also call OpenRouter Jev.
 
 Diagnostics:
 
