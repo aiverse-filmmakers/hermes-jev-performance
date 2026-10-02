@@ -49,7 +49,7 @@ No state/prompt column exists.
 
 ## 4. Hermes turn record
 
-Current schema v3 table: `hermes_turns`.
+Current schema v4 table: `hermes_turns`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -72,6 +72,10 @@ Current schema v3 table: `hermes_turns`.
 | benchmark_sample_id | text nullable | random controlled-benchmark sample correlation |
 | benchmark_fixture_id | text nullable | public fixture identifier |
 | benchmark_warmup | boolean | whether sample is warm-up only |
+| provider | text nullable | first successful main-loop Hermes provider |
+| requested_model | text nullable | requested Hermes model from the successful provider hook |
+| response_model | text nullable | provider-returned response model when available |
+| api_mode | text nullable | Hermes provider API mode |
 
 Benchmark tags contain identifiers only. They do not contain prompt text.
 
@@ -96,12 +100,12 @@ By default:
 $HERMES_HOME/plugin-data/hermes-jev-performance/metrics.sqlite3
 ```
 
-Current schema version: **3**.
+Current schema version: **4**.
 
 Migration path:
 
 ```text
-v1 -> v2 -> v3
+v1 -> v2 -> v3 -> v4
 ```
 
 A database with a newer unknown schema fails closed for telemetry only; Hermes routing remains independent.
@@ -154,7 +158,7 @@ Ordinary OFF, SHADOW and ON usage may be compared, but must be labelled observat
 
 ## 10. Controlled benchmark schema
 
-Schema v3 adds `benchmark_runs` and `benchmark_samples`.
+Schema v3 adds `benchmark_runs` and `benchmark_samples`. Schema v4 adds content-free Hermes runtime identity fields so benchmark samples can record the actual primary provider/requested model/response model/API mode observed from successful main-loop hooks.
 
 ### benchmark_runs
 
