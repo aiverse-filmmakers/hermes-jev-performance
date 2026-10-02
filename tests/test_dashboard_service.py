@@ -99,7 +99,7 @@ class DashboardServiceTests(unittest.TestCase):
             ),
             applied=True,
             reason="filtered",
-            now=100.1,
+            now=now + 0.1,
         )
         payload = summary_payload(hours=24, store=store)
         self.assertEqual(payload["routes"], [{"family": "terminal", "count": 1}])
