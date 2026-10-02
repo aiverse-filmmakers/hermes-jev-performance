@@ -1,13 +1,13 @@
 # Implementation Status
 
-**Current stage:** Phase 0 - Foundation / source-of-truth documentation.
+**Current stage:** Phase 1 - Hermes plugin skeleton (stacked behind Phase 0 documentation PR).
 
 ## Phase status
 
 | Phase | Name | Status | Gate |
 |---|---|---|---|
 | 0 | Foundation and provenance | In review | P0 |
-| 1 | Hermes plugin skeleton | Not started | P1 |
+| 1 | Hermes plugin skeleton | In progress (1/8) | P1 |
 | 2 | OpenRouter Jev client | Not started | P2 |
 | 3 | Tool-family router | Not started | P3 |
 | 4 | Off/Shadow/On middleware | Not started | P4 |
@@ -34,11 +34,11 @@
 
 ## Current blockers
 
-None for Phase 1 after Phase 0 documentation is merged.
+Phase 0 documentation PR must merge before the Phase 1 implementation branch is merged. Phase 1 work may be prepared as a stacked branch in the meantime.
 
 ## Next implementation action
 
-Start **Phase 1.1**: create the plugin manifest and minimal importable plugin skeleton on a dedicated feature branch.
+Start **Phase 1.2**: create the minimal no-op `register(ctx)` entry point. It must import/register cleanly and make no network calls.
 
 ## Status update rule
 
