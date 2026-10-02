@@ -294,15 +294,32 @@ The UI must use Hermes' dashboard plugin SDK and the backend API must be mounted
 
 The plugin MUST NOT start a second publicly exposed dashboard server for the normal Hermes integration.
 
-Dashboard backend responsibilities:
+Implemented Phase 7 dashboard backend responsibilities:
 
-- status/mode read;
-- mode write;
-- aggregate metrics;
-- recent decisions;
-- comparison data;
-- retention/clear action only with explicit confirmation design;
-- health/compatibility information.
+- `GET /status` for current mode/config + 24h summary;
+- `GET /summary?hours=` for safe aggregate metrics;
+- `GET /analytics?hours=&limit=` for route distribution, fallback reasons, time series, recent decision metadata and OFF/SHADOW/ON observational comparison;
+- `PUT /mode` for validated off/shadow/on changes through Hermes' canonical plugin-settings writer with read-back verification;
+- no prompt, tool payload, raw turn key or local filesystem path in dashboard responses;
+- mode-change audit metadata written locally when telemetry storage is available.
+
+The dashboard bundle calls these routes only through Hermes `SDK.fetchJSON`, which carries dashboard authentication. Hermes mounts plugin routes behind its normal dashboard auth gate.
+
+### 12.1 Implemented dashboard UI
+
+The `Jev Performance` tab is a pre-built Hermes SDK IIFE with theme-aware CSS. It currently provides:
+
+- live OFF / SHADOW / ON status and mode control;
+- Jev latency, confidence and provider-reported cost cards;
+- route distribution;
+- routing outcome/fallback breakdown;
+- Hermes turn-duration, tool-call, LLM-request and token time-series charts;
+- recent Jev decision metadata;
+- OFF / SHADOW / ON observational comparison;
+- 24h / 7d / 30d ranges;
+- responsive/mobile layout.
+
+The UI labels ordinary mode comparisons as observational/not causal. Controlled benchmark results are reserved for Phase 8.
 
 ## 13. Gateway/Telegram architecture
 
