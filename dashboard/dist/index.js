@@ -14,6 +14,14 @@
   const h = React.createElement;
   const API = "/api/plugins/hermes-jev-performance";
 
+  function apiUrl(path) {
+    const raw = API + path;
+    const profile = new URLSearchParams(window.location.search).get("profile");
+    if (!profile) return raw;
+    const sep = raw.indexOf("?") >= 0 ? "&" : "?";
+    return raw + sep + "profile=" + encodeURIComponent(profile);
+  }
+
   function n(value) {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   }
@@ -453,9 +461,9 @@
     const load = hooks.useCallback(function (quiet) {
       if (!quiet) setLoading(true);
       return Promise.all([
-        SDK.fetchJSON(API + "/status"),
-        SDK.fetchJSON(API + "/analytics?hours=" + hours + "&limit=30"),
-        SDK.fetchJSON(API + "/benchmarks?limit=10")
+        SDK.fetchJSON(apiUrl("/status")),
+        SDK.fetchJSON(apiUrl("/analytics?hours=" + hours + "&limit=30")),
+        SDK.fetchJSON(apiUrl("/benchmarks?limit=10"))
       ])
         .then(function (payloads) {
           setData(payloads[0]);
@@ -478,7 +486,7 @@
     }, [load]);
 
     function exportBenchmark(runId) {
-      SDK.fetchJSON(API + "/benchmarks/" + encodeURIComponent(runId) + "/export")
+      SDK.fetchJSON(apiUrl("/benchmarks/" + encodeURIComponent(runId) + "/export"))
         .then(function (payload) {
           const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -500,7 +508,7 @@
       if (!data || mode === data.mode || busy) return;
       setBusy(true);
       setFeedback(null);
-      SDK.fetchJSON(API + "/mode", {
+      SDK.fetchJSON(apiUrl("/mode"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: mode })
@@ -590,9 +598,9 @@
         ),
         h("div", { className: "jv-metric-grid" },
           h(MetricCard, {
-            label: "Jev decision latency",
-            value: fmtMs(summary.avg_jev_latency_ms),
-            note: "Average decision round-trip"
+            label: "Jev latency p50 / p95",
+            value: fmtMs(summary.p50_jev_latency_ms) + " / " + fmtMs(summary.p95_jev_latency_ms),
+            note: "Average " + fmtMs(summary.avg_jev_latency_ms)
           }),
           h(MetricCard, {
             label: "Jev confidence",
@@ -600,9 +608,9 @@
             note: "Average provider-returned confidence"
           }),
           h(MetricCard, {
-            label: "Jev cost",
-            value: fmtCost(summary.total_jev_cost_usd),
-            note: "Provider-reported total"
+            label: "Jev cost avg / total",
+            value: fmtCost(summary.avg_jev_cost_usd) + " / " + fmtCost(summary.total_jev_cost_usd),
+            note: "Provider-reported usage only"
           }),
           h(MetricCard, {
             label: "Routes applied",
