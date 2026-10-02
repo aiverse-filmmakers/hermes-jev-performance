@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import json
 import os
 import sqlite3
 import threading
@@ -12,7 +13,7 @@ import time
 from typing import Any
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PLUGIN_DATA_DIR = "hermes-jev-performance"
 DB_FILENAME = "metrics.sqlite3"
 
@@ -195,6 +196,87 @@ class MetricsStore:
         if "route_reason" not in columns:
             con.execute("ALTER TABLE hermes_turns ADD COLUMN route_reason TEXT")
 
+    def _migrate_v3(self, con: sqlite3.Connection) -> None:
+        columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(hermes_turns)").fetchall()
+        }
+        additions = {
+            "benchmark_run_id": "TEXT",
+            "benchmark_sample_id": "TEXT",
+            "benchmark_fixture_id": "TEXT",
+            "benchmark_warmup": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for name, sql_type in additions.items():
+            if name not in columns:
+                con.execute(
+                    f"ALTER TABLE hermes_turns ADD COLUMN {name} {sql_type}"
+                )
+
+        con.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_hermes_turns_benchmark_run
+            ON hermes_turns(benchmark_run_id);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_hermes_turns_benchmark_sample
+            ON hermes_turns(benchmark_sample_id)
+            WHERE benchmark_sample_id IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS benchmark_runs (
+                run_id TEXT PRIMARY KEY,
+                created_at REAL NOT NULL,
+                completed_at REAL,
+                status TEXT NOT NULL,
+                benchmark_version INTEGER NOT NULL,
+                fixture_set_hash TEXT NOT NULL,
+                fixture_count INTEGER NOT NULL,
+                repeats INTEGER NOT NULL,
+                warmups INTEGER NOT NULL,
+                environment_json TEXT NOT NULL,
+                methodology_json TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_benchmark_runs_created
+            ON benchmark_runs(created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS benchmark_samples (
+                sample_id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                fixture_id TEXT NOT NULL,
+                family TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                repeat_index INTEGER NOT NULL,
+                order_index INTEGER NOT NULL,
+                is_warmup INTEGER NOT NULL DEFAULT 0,
+                started_at REAL NOT NULL,
+                completed_at REAL,
+                status TEXT NOT NULL,
+                runner_duration_ms REAL,
+                exit_code INTEGER,
+                validation_passed INTEGER,
+                hermes_duration_ms REAL,
+                llm_requests INTEGER,
+                tool_calls INTEGER,
+                input_tokens INTEGER,
+                cached_input_tokens INTEGER,
+                output_tokens INTEGER,
+                reasoning_tokens INTEGER,
+                route_family TEXT,
+                route_applied INTEGER,
+                jev_latency_ms REAL,
+                jev_cost_usd REAL,
+                jev_confidence REAL,
+                error_category TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_benchmark_samples_run
+            ON benchmark_samples(run_id, order_index);
+
+            CREATE INDEX IF NOT EXISTS idx_benchmark_samples_pair
+            ON benchmark_samples(run_id, fixture_id, repeat_index, mode);
+            """
+        )
+
     def initialize(self) -> None:
         if self._initialized:
             return
@@ -214,19 +296,53 @@ class MetricsStore:
                 if version < 2:
                     self._migrate_v2(con)
                     self._set_schema_version(con, 2)
+                    version = 2
+                if version < 3:
+                    self._migrate_v3(con)
+                    self._set_schema_version(con, 3)
             self._initialized = True
 
-    def touch_turn(self, turn_key: str, mode: str, *, now: float | None = None) -> None:
+    def touch_turn(
+        self,
+        turn_key: str,
+        mode: str,
+        *,
+        benchmark: Any = None,
+        now: float | None = None,
+    ) -> None:
         self.initialize()
         ts = float(now if now is not None else time.time())
+        run_id = getattr(benchmark, "run_id", None)
+        sample_id = getattr(benchmark, "sample_id", None)
+        fixture_id = getattr(benchmark, "fixture_id", None)
+        is_warmup = 1 if bool(getattr(benchmark, "is_warmup", False)) else 0
         with self._connection() as con:
             con.execute(
                 """
-                INSERT OR IGNORE INTO hermes_turns(turn_key, started_at, mode)
-                VALUES(?, ?, ?)
+                INSERT OR IGNORE INTO hermes_turns(
+                    turn_key, started_at, mode,
+                    benchmark_run_id, benchmark_sample_id,
+                    benchmark_fixture_id, benchmark_warmup
+                )
+                VALUES(?, ?, ?, ?, ?, ?, ?)
                 """,
-                (turn_key, ts, mode),
+                (
+                    turn_key, ts, mode,
+                    run_id, sample_id, fixture_id, is_warmup,
+                ),
             )
+            if sample_id:
+                con.execute(
+                    """
+                    UPDATE hermes_turns
+                    SET benchmark_run_id = COALESCE(benchmark_run_id, ?),
+                        benchmark_sample_id = COALESCE(benchmark_sample_id, ?),
+                        benchmark_fixture_id = COALESCE(benchmark_fixture_id, ?),
+                        benchmark_warmup = ?
+                    WHERE turn_key = ?
+                    """,
+                    (run_id, sample_id, fixture_id, is_warmup, turn_key),
+                )
 
     def record_decision(
         self,
@@ -409,6 +525,8 @@ class MetricsStore:
         days = max(1, int(retention_days))
         cutoff = float(now if now is not None else time.time()) - (days * 86400)
         with self._connection() as con:
+            con.execute("DELETE FROM benchmark_samples WHERE started_at < ?", (cutoff,))
+            con.execute("DELETE FROM benchmark_runs WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM jev_decisions WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM hermes_turns WHERE started_at < ?", (cutoff,))
             con.execute("DELETE FROM mode_changes WHERE created_at < ?", (cutoff,))
@@ -427,8 +545,10 @@ class MetricsStore:
                     AVG(confidence) AS avg_confidence,
                     AVG(latency_ms) AS avg_latency,
                     SUM(cost_usd) AS total_cost
-                FROM jev_decisions
-                WHERE created_at >= ?
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
                 """,
                 (cutoff,),
             ).fetchone()
@@ -444,16 +564,19 @@ class MetricsStore:
                     SUM(output_tokens) AS output_tokens
                 FROM hermes_turns
                 WHERE started_at >= ?
+                  AND benchmark_run_id IS NULL
                 """,
                 (cutoff,),
             ).fetchone()
 
             routes = con.execute(
                 """
-                SELECT COALESCE(family, 'fallback') AS family, COUNT(*) AS count
-                FROM jev_decisions
-                WHERE created_at >= ?
-                GROUP BY COALESCE(family, 'fallback')
+                SELECT COALESCE(jd.family, 'fallback') AS family, COUNT(*) AS count
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
+                GROUP BY COALESCE(jd.family, 'fallback')
                 ORDER BY count DESC, family ASC
                 """,
                 (cutoff,),
@@ -498,9 +621,11 @@ class MetricsStore:
                     family, confidence, latency_ms, cost_usd,
                     input_tokens, output_tokens, accepted, applied, reason,
                     error_category, error_status_code
-                FROM jev_decisions
-                WHERE created_at >= ?
-                ORDER BY created_at DESC
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
+                ORDER BY jd.created_at DESC
                 LIMIT ?
                 """,
                 (cutoff, row_limit),
@@ -542,6 +667,7 @@ class MetricsStore:
                 SELECT COALESCE(route_reason, 'unknown') AS reason, COUNT(*) AS count
                 FROM hermes_turns
                 WHERE started_at >= ?
+                  AND benchmark_run_id IS NULL
                 GROUP BY COALESCE(route_reason, 'unknown')
                 ORDER BY count DESC, reason ASC
                 """,
@@ -579,6 +705,7 @@ class MetricsStore:
                     AVG(reasoning_tokens) AS avg_reasoning_tokens
                 FROM hermes_turns
                 WHERE started_at >= ?
+                  AND benchmark_run_id IS NULL
                 GROUP BY mode
                 """,
                 (cutoff,),
@@ -586,15 +713,17 @@ class MetricsStore:
             decision_rows = con.execute(
                 """
                 SELECT
-                    mode,
+                    jd.mode AS mode,
                     COUNT(*) AS decisions,
                     COALESCE(SUM(applied), 0) AS applied,
                     AVG(latency_ms) AS avg_jev_latency_ms,
                     AVG(confidence) AS avg_jev_confidence,
                     SUM(cost_usd) AS total_jev_cost_usd
-                FROM jev_decisions
-                WHERE created_at >= ?
-                GROUP BY mode
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
+                GROUP BY jd.mode
                 """,
                 (cutoff,),
             ).fetchall()
@@ -657,6 +786,7 @@ class MetricsStore:
                     SUM(reasoning_tokens) AS reasoning_tokens
                 FROM hermes_turns
                 WHERE started_at >= ? AND started_at <= ?
+                  AND benchmark_run_id IS NULL
                 GROUP BY bucket
                 ORDER BY bucket ASC
                 """,
@@ -678,6 +808,316 @@ class MetricsStore:
             }
             for row in rows
         ]
+
+
+    def start_benchmark_run(
+        self,
+        *,
+        run_id: str,
+        benchmark_version: int,
+        fixture_set_hash: str,
+        fixture_count: int,
+        repeats: int,
+        warmups: int,
+        environment: dict[str, Any],
+        methodology: dict[str, Any],
+        now: float | None = None,
+    ) -> None:
+        self.initialize()
+        ts = float(now if now is not None else time.time())
+        with self._connection() as con:
+            con.execute(
+                """
+                INSERT INTO benchmark_runs(
+                    run_id, created_at, status, benchmark_version,
+                    fixture_set_hash, fixture_count, repeats, warmups,
+                    environment_json, methodology_json
+                ) VALUES(?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    ts,
+                    int(benchmark_version),
+                    str(fixture_set_hash),
+                    int(fixture_count),
+                    int(repeats),
+                    int(warmups),
+                    json.dumps(environment, sort_keys=True, separators=(",", ":")),
+                    json.dumps(methodology, sort_keys=True, separators=(",", ":")),
+                ),
+            )
+
+    def finish_benchmark_run(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        now: float | None = None,
+    ) -> None:
+        self.initialize()
+        ts = float(now if now is not None else time.time())
+        with self._connection() as con:
+            con.execute(
+                """
+                UPDATE benchmark_runs
+                SET completed_at = ?, status = ?
+                WHERE run_id = ?
+                """,
+                (ts, str(status or "unknown"), run_id),
+            )
+
+    def plan_benchmark_sample(
+        self,
+        *,
+        sample_id: str,
+        run_id: str,
+        fixture_id: str,
+        family: str,
+        mode: str,
+        repeat_index: int,
+        order_index: int,
+        is_warmup: bool,
+        now: float | None = None,
+    ) -> None:
+        self.initialize()
+        ts = float(now if now is not None else time.time())
+        with self._connection() as con:
+            con.execute(
+                """
+                INSERT INTO benchmark_samples(
+                    sample_id, run_id, fixture_id, family, mode,
+                    repeat_index, order_index, is_warmup,
+                    started_at, status
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'running')
+                """,
+                (
+                    sample_id,
+                    run_id,
+                    fixture_id,
+                    family,
+                    mode,
+                    int(repeat_index),
+                    int(order_index),
+                    1 if is_warmup else 0,
+                    ts,
+                ),
+            )
+
+    def finalize_benchmark_sample(
+        self,
+        sample_id: str,
+        *,
+        runner_duration_ms: float | None,
+        exit_code: int | None,
+        validation_passed: bool | None,
+        error_category: str | None = None,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        self.initialize()
+        ts = float(now if now is not None else time.time())
+        with self._connection() as con:
+            turn = con.execute(
+                """
+                SELECT *
+                FROM hermes_turns
+                WHERE benchmark_sample_id = ?
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                (sample_id,),
+            ).fetchone()
+            decision = None
+            if turn is not None:
+                decision = con.execute(
+                    """
+                    SELECT *
+                    FROM jev_decisions
+                    WHERE turn_key = ?
+                    LIMIT 1
+                    """,
+                    (turn["turn_key"],),
+                ).fetchone()
+
+            telemetry_complete = bool(
+                turn is not None and str(turn["status"]) == "complete"
+            )
+            process_ok = exit_code == 0
+            validation_ok = validation_passed is not False
+
+            if process_ok and telemetry_complete and validation_ok:
+                status = "complete"
+            elif turn is None:
+                status = "missing_telemetry"
+            elif not process_ok:
+                status = "process_error"
+            elif not validation_ok:
+                status = "validation_failed"
+            else:
+                status = "incomplete"
+
+            safe_error = error_category
+            if safe_error is None and status != "complete":
+                safe_error = status
+
+            con.execute(
+                """
+                UPDATE benchmark_samples
+                SET completed_at = ?,
+                    status = ?,
+                    runner_duration_ms = ?,
+                    exit_code = ?,
+                    validation_passed = ?,
+                    hermes_duration_ms = ?,
+                    llm_requests = ?,
+                    tool_calls = ?,
+                    input_tokens = ?,
+                    cached_input_tokens = ?,
+                    output_tokens = ?,
+                    reasoning_tokens = ?,
+                    route_family = ?,
+                    route_applied = ?,
+                    jev_latency_ms = ?,
+                    jev_cost_usd = ?,
+                    jev_confidence = ?,
+                    error_category = ?
+                WHERE sample_id = ?
+                """,
+                (
+                    ts,
+                    status,
+                    _number(runner_duration_ms),
+                    exit_code,
+                    None if validation_passed is None else (1 if validation_passed else 0),
+                    _number(turn["duration_ms"]) if turn is not None else None,
+                    _integer(turn["llm_requests"]) if turn is not None else None,
+                    _integer(turn["tool_calls"]) if turn is not None else None,
+                    _integer(turn["input_tokens"]) if turn is not None else None,
+                    _integer(turn["cached_input_tokens"]) if turn is not None else None,
+                    _integer(turn["output_tokens"]) if turn is not None else None,
+                    _integer(turn["reasoning_tokens"]) if turn is not None else None,
+                    turn["route_family"] if turn is not None else None,
+                    int(turn["route_applied"] or 0) if turn is not None else None,
+                    _number(decision["latency_ms"]) if decision is not None else None,
+                    _number(decision["cost_usd"]) if decision is not None else None,
+                    _number(decision["confidence"]) if decision is not None else None,
+                    safe_error,
+                    sample_id,
+                ),
+            )
+            row = con.execute(
+                "SELECT * FROM benchmark_samples WHERE sample_id = ?",
+                (sample_id,),
+            ).fetchone()
+        return self._benchmark_sample_payload(row)
+
+    @staticmethod
+    def _benchmark_sample_payload(row: sqlite3.Row | None) -> dict[str, Any]:
+        if row is None:
+            return {}
+        return {
+            "sample_id": str(row["sample_id"]),
+            "fixture_id": str(row["fixture_id"]),
+            "family": str(row["family"]),
+            "mode": str(row["mode"]),
+            "repeat_index": int(row["repeat_index"]),
+            "order_index": int(row["order_index"]),
+            "is_warmup": bool(row["is_warmup"]),
+            "started_at": float(row["started_at"]),
+            "completed_at": _number(row["completed_at"]),
+            "status": str(row["status"]),
+            "runner_duration_ms": _number(row["runner_duration_ms"]),
+            "exit_code": row["exit_code"],
+            "validation_passed": (
+                None if row["validation_passed"] is None
+                else bool(row["validation_passed"])
+            ),
+            "hermes_duration_ms": _number(row["hermes_duration_ms"]),
+            "llm_requests": _integer(row["llm_requests"]),
+            "tool_calls": _integer(row["tool_calls"]),
+            "input_tokens": _integer(row["input_tokens"]),
+            "cached_input_tokens": _integer(row["cached_input_tokens"]),
+            "output_tokens": _integer(row["output_tokens"]),
+            "reasoning_tokens": _integer(row["reasoning_tokens"]),
+            "route_family": row["route_family"],
+            "route_applied": (
+                None if row["route_applied"] is None else bool(row["route_applied"])
+            ),
+            "jev_latency_ms": _number(row["jev_latency_ms"]),
+            "jev_cost_usd": _number(row["jev_cost_usd"]),
+            "jev_confidence": _number(row["jev_confidence"]),
+            "error_category": row["error_category"],
+        }
+
+    def benchmark_samples(
+        self,
+        run_id: str,
+        *,
+        include_warmups: bool = True,
+    ) -> list[dict[str, Any]]:
+        self.initialize()
+        query = """
+            SELECT *
+            FROM benchmark_samples
+            WHERE run_id = ?
+        """
+        params: list[Any] = [run_id]
+        if not include_warmups:
+            query += " AND is_warmup = 0"
+        query += " ORDER BY order_index ASC"
+        with self._connection() as con:
+            rows = con.execute(query, params).fetchall()
+        return [self._benchmark_sample_payload(row) for row in rows]
+
+    def benchmark_run_record(self, run_id: str) -> dict[str, Any] | None:
+        self.initialize()
+        with self._connection() as con:
+            row = con.execute(
+                "SELECT * FROM benchmark_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            environment = json.loads(str(row["environment_json"]))
+        except Exception:
+            environment = {}
+        try:
+            methodology = json.loads(str(row["methodology_json"]))
+        except Exception:
+            methodology = {}
+        return {
+            "run_id": str(row["run_id"]),
+            "created_at": float(row["created_at"]),
+            "completed_at": _number(row["completed_at"]),
+            "status": str(row["status"]),
+            "benchmark_version": int(row["benchmark_version"]),
+            "fixture_set_hash": str(row["fixture_set_hash"]),
+            "fixture_count": int(row["fixture_count"]),
+            "repeats": int(row["repeats"]),
+            "warmups": int(row["warmups"]),
+            "environment": environment if isinstance(environment, dict) else {},
+            "methodology": methodology if isinstance(methodology, dict) else {},
+        }
+
+    def list_benchmark_runs(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        self.initialize()
+        row_limit = max(1, min(int(limit), 100))
+        with self._connection() as con:
+            rows = con.execute(
+                """
+                SELECT run_id
+                FROM benchmark_runs
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (row_limit,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            record = self.benchmark_run_record(str(row["run_id"]))
+            if record is not None:
+                result.append(record)
+        return result
 
 
 class StoreProvider:
