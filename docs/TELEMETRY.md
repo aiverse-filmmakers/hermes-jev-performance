@@ -21,7 +21,7 @@ Persist metadata only. Do not persist:
 
 ## 3. Decision record
 
-Proposed table: `jev_decisions`.
+Current schema v2 table: `jev_decisions`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -30,7 +30,7 @@ Proposed table: `jev_decisions`.
 | created_at | datetime | decision time |
 | mode | text | off/shadow/on |
 | provider | text | e.g. openrouter |
-| model | text | actual/requested Jev model identifier |
+| requested_model | text nullable | requested Jev model identifier |\n| actual_model | text nullable | provider-returned Jev model identifier |
 | family | text nullable | chosen route |
 | confidence | real nullable | provider-returned confidence |
 | latency_ms | real nullable | measured Jev request wall time |
@@ -40,13 +40,13 @@ Proposed table: `jev_decisions`.
 | accepted | boolean | route passed policy |
 | applied | boolean | tool policy actually changed request |
 | reason | text | applied/skipped/failure reason code |
-| error_code | text nullable | normalized safe error |
+| error_category | text nullable | normalized safe error category |\n| error_status_code | integer nullable | safe HTTP status when available |
 
 No state/prompt column exists.
 
 ## 4. Turn record
 
-Proposed table: `hermes_turns`.
+Current schema v2 table: `hermes_turns`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -56,7 +56,7 @@ Proposed table: `hermes_turns`.
 | completed_at | datetime nullable | final observed completion |
 | mode | text | mode at turn start |
 | route_family | text nullable | selected family |
-| route_applied | boolean | whether filtering applied |
+| route_applied | boolean | whether filtering applied |\n| route_reason | text nullable | filtered/shadow/mode_off/fallback reason code |
 | duration_ms | real nullable | end-to-end observed turn duration |
 | llm_requests | integer | provider/LLM requests in turn |
 | tool_calls | integer | tool calls in turn |
@@ -71,7 +71,7 @@ Again, no prompt or tool payload fields.
 
 ## 5. Settings/audit record
 
-Mode changes SHOULD be auditable locally with metadata only:
+Mode changes are auditable locally in the `mode_changes` table with metadata only:
 
 ```text
 timestamp
@@ -80,9 +80,9 @@ new_mode
 source: command | dashboard | cli | config
 ```
 
-No chat ID or user identity is required for v1 metrics.
+No chat ID or user identity is stored for v1 metrics. `turn_key` is generated from Hermes correlation IDs with SHA-256 and only a shortened opaque digest is persisted.
 
-## 6. Core calculations
+## 5.1 Storage location\n\nBy default, metrics live under the active Hermes profile at:\n\n```text\n$HERMES_HOME/plugin-data/hermes-jev-performance/metrics.sqlite3\n```\n\nThe database uses versioned migrations. Schema v2 is the current Phase 6 schema. A database with a newer unknown schema fails closed for telemetry only; Hermes routing remains independent.\n\n## 6. Core calculations
 
 ### Jev latency
 
@@ -164,4 +164,4 @@ Jev cost should come from provider-returned usage when available. If unavailable
 
 Default target: 30 days, configurable.
 
-Retention cleanup deletes old metrics locally. A manual clear operation must require explicit user action in CLI/dashboard and must not touch Hermes conversation history.
+Retention cleanup deletes old metrics locally and is throttled to run at most once per hour per active profile during normal telemetry collection. A manual clear operation must require explicit user action in CLI/dashboard and must not touch Hermes conversation history.
