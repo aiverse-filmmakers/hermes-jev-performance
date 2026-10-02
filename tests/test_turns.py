@@ -69,6 +69,30 @@ class TurnTests(unittest.TestCase):
         self.assertIsNone(cache.get("a"))
         self.assertEqual(cache.get("c"), {"family": "memory"})
 
+    def test_get_or_compute_runs_factory_once_per_turn_under_concurrency(self):
+        cache = TurnDecisionCache()
+        calls = []
+        results = []
+        barrier = threading.Barrier(4)
+
+        def factory():
+            calls.append(1)
+            time.sleep(0.03)
+            return {"family": "web"}
+
+        def worker():
+            barrier.wait()
+            results.append(cache.get_or_compute("session:turn", factory))
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(results, [{"family": "web"}] * 4)
+
 
 if __name__ == "__main__":
     unittest.main()
