@@ -88,6 +88,19 @@ class TelemetryObserver:
             reason=reason,
         )
 
+    def record_turn_reason(
+        self,
+        *,
+        session_id: Any,
+        turn_id: Any,
+        mode: str,
+        reason: str,
+    ) -> None:
+        key = self.start_turn(session_id, turn_id, mode=mode)
+        if key is None or not read_config(self.ctx).telemetry_enabled:
+            return
+        _safe_call(self.stores.get().record_turn_reason, key, reason)
+
     def on_pre_api_request(self, **kwargs: Any) -> None:
         key = self.start_turn(kwargs.get("session_id"), kwargs.get("turn_id"))
         if key is None or not read_config(self.ctx).telemetry_enabled:
