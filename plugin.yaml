@@ -1,0 +1,8 @@
+name: hermes-jev-performance
+version: 0.1.0-alpha.1
+manifest_version: 2
+api_version: 1
+description: Hermes-native Jev tool routing and performance observability.
+license: MIT
+homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
+tags: [jev, routing, observability, performance, openrouter]
