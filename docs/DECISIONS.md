@@ -24,7 +24,7 @@ Jev chooses tool families in v1. It does not change the primary model/provider.
 
 OpenRouter Decisions API is the v1 Jev provider. Provider abstraction remains narrow enough to permit future adapters.
 
-**Why:** existing upstream implementation exists, the endpoint exposes the required Jev contract, and it keeps the first implementation focused.
+**Why:** existing upstream implementation exists, the endpoint exposes the required Jev contract, and it keeps the first implementation focused. The v1 default is pinned to `typesafe/jev-1.13` for reproducible measurements; a moving alias such as `~typesafe/jev-latest` may be selected explicitly through configuration.
 
 ## ADR-004 - Off / Shadow / On
 

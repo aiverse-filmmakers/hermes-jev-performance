@@ -1,14 +1,14 @@
 # Implementation Status
 
-**Current stage:** Phase 1 - Hermes plugin skeleton implemented; P1 live Hermes validation pending.
+**Current stage:** Phase 2 - OpenRouter Jev client implemented; live provider smoke gate pending.
 
 ## Phase status
 
 | Phase | Name | Status | Gate |
 |---|---|---|---|
 | 0 | Foundation and provenance | In review | P0 |
-| 1 | Hermes plugin skeleton | Implementation complete (8/8); gate pending | P1 |
-| 2 | OpenRouter Jev client | Not started | P2 |
+| 1 | Hermes plugin skeleton | Implementation complete (8/8); live gate pending | P1 |
+| 2 | OpenRouter Jev client | Implementation complete (10/10); live gate pending | P2 |
 | 3 | Tool-family router | Not started | P3 |
 | 4 | Off/Shadow/On middleware | Not started | P4 |
 | 5 | Telegram/gateway and CLI controls | Not started | P5 |
@@ -34,11 +34,11 @@
 
 ## Current blockers
 
-Phase 0 documentation PR must merge before the Phase 1 implementation branch is merged. P1 still requires one live `hermes plugins doctor <plugin> --ci` validation against a supported Hermes install.
+The branch stack remains Phase 0 -> Phase 1 -> Phase 2. P1 still requires live Hermes Plugin Doctor/status validation. P2 still requires one explicit live `python -m jevperf.smoke` call against OpenRouter. Neither live gate is faked by CI.
 
 ## Next implementation action
 
-Complete **Gate P1** on a supported Hermes install: run Plugin Doctor and verify `/jev status`. After P1 passes, start Phase 2.1 (OpenRouter Decisions client).
+Complete the pending live P1/P2 gates on a supported Hermes/OpenRouter installation. After those gates pass, start **Phase 3.1**: define the 10-family routing criteria and deterministic routing fixtures.
 
 ## Status update rule
 
