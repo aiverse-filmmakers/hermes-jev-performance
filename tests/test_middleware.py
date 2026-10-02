@@ -114,7 +114,7 @@ class MiddlewareTests(unittest.TestCase):
         router = FakeRouter(self.decision("multi"))
         mw = RoutingMiddleware(FakeContext({"mode": "on"}), router=router)
         self.assertIsNone(self.call(mw))
-        self.assertEqual(mw.last_filter_reason, "accepted")
+        self.assertEqual(mw.last_filter_reason, "unrestricted_multi")
 
     def test_low_confidence_never_filters(self):
         router = FakeRouter(self.decision("web", 0.4, False, "low_or_missing_confidence"))
