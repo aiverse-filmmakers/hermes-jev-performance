@@ -82,6 +82,28 @@ class ClientTests(unittest.TestCase):
             self.evaluate(model="~typesafe/jev-latest")
         self.assertEqual(seen["model"], "~typesafe/jev-latest")
 
+    def test_missing_usage_is_allowed(self):
+        response = {key: value for key, value in RESPONSE.items() if key != "usage"}
+        with mock.patch.object(
+            client,
+            "_transport",
+            return_value=json.dumps(response).encode(),
+        ):
+            result = self.evaluate()
+        self.assertEqual(result["usage"], {})
+
+    def test_missing_cost_is_allowed(self):
+        response = json.loads(json.dumps(RESPONSE))
+        response["usage"].pop("cost")
+        with mock.patch.object(
+            client,
+            "_transport",
+            return_value=json.dumps(response).encode(),
+        ):
+            result = self.evaluate()
+        self.assertNotIn("cost", result["usage"])
+        self.assertEqual(result["usage"]["input_tokens"], 288)
+
     def test_malformed_json_is_safe_error(self):
         with mock.patch.object(client, "_transport", return_value=b"{not-json"):
             with self.assertRaises(client.JevError) as raised:
