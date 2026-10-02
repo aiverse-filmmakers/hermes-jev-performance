@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +75,13 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         if action == "stats":
             print(render_stats(telemetry))
             return 0
+        if action == "doctor":
+            report = run_doctor(ctx)
+            if bool(getattr(args, "json", False)):
+                print(json.dumps(report, sort_keys=True))
+            else:
+                print(render_doctor(report))
+            return 1 if report.get("overall") == "fail" else 0
         if action == "notice":
             state = str(getattr(args, "state", "") or "").lower()
             print(set_notice(ctx, state == "on"))
@@ -142,7 +150,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print(f"Export: {written}")
             return 0
 
-        print("Usage: hermes jev {status|on|off|shadow|stats|notice|benchmark}")
+        print("Usage: hermes jev {status|on|off|shadow|stats|doctor|notice|benchmark}")
         return 2
 
     return setup, handler
