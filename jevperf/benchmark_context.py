@@ -16,6 +16,7 @@ RUN_ID_ENV = "HERMES_JEV_BENCHMARK_RUN_ID"
 SAMPLE_ID_ENV = "HERMES_JEV_BENCHMARK_SAMPLE_ID"
 FIXTURE_ID_ENV = "HERMES_JEV_BENCHMARK_FIXTURE_ID"
 WARMUP_ENV = "HERMES_JEV_BENCHMARK_WARMUP"
+MODE_ENV = "HERMES_JEV_BENCHMARK_MODE"
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 
@@ -52,10 +53,21 @@ def read_benchmark_context(
     )
 
 
-def benchmark_env(context: BenchmarkContext) -> dict[str, str]:
-    return {
+def benchmark_env(context: BenchmarkContext, *, mode: str | None = None) -> dict[str, str]:
+    result = {
         RUN_ID_ENV: context.run_id,
         SAMPLE_ID_ENV: context.sample_id,
         FIXTURE_ID_ENV: context.fixture_id,
         WARMUP_ENV: "1" if context.is_warmup else "0",
     }
+    if mode in {"off", "on"}:
+        result[MODE_ENV] = mode
+    return result
+
+
+def read_benchmark_mode(environ: Mapping[str, str] | None = None) -> str | None:
+    env = os.environ if environ is None else environ
+    if read_benchmark_context(env) is None:
+        return None
+    mode = str(env.get(MODE_ENV, "")).strip().lower()
+    return mode if mode in {"off", "on"} else None
