@@ -35,6 +35,11 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
 
         doctor = sub.add_parser("doctor", help="Run local Jev diagnostics without network calls.")
         doctor.add_argument("--json", action="store_true", help="Print machine-readable diagnostic JSON.")
+        doctor.add_argument(
+            "--repair-db",
+            action="store_true",
+            help="Quarantine a corrupt local metrics DB and create a clean schema.",
+        )
 
         notice = sub.add_parser("notice", help="Control concise reply notices.")
         notice.add_argument("state", choices=("on", "off"))
@@ -76,7 +81,10 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             print(render_stats(telemetry))
             return 0
         if action == "doctor":
-            report = run_doctor(ctx)
+            report = run_doctor(
+                ctx,
+                repair_db=bool(getattr(args, "repair_db", False)),
+            )
             if bool(getattr(args, "json", False)):
                 print(json.dumps(report, sort_keys=True))
             else:
