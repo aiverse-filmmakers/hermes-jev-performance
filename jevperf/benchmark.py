@@ -310,3 +310,62 @@ def calculate_comparison(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]
             "cheaper, or better without reviewing sample count, failures, and methodology."
         ),
     }
+
+
+def run_synthetic_benchmark(
+    path: Path | str,
+    *,
+    repeats: int = 3,
+    warmups: int = 1,
+) -> dict[str, Any]:
+    """Deterministic CI-only benchmark. Reads fixture metrics and makes no external calls."""
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    rows = raw.get("fixtures") if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("synthetic benchmark fixture file must contain fixtures")
+
+    fixtures = [
+        _fixture_from_mapping(row)
+        for row in rows
+        if isinstance(row, Mapping)
+    ]
+    by_id = {
+        str(row.get("id")): row
+        for row in rows
+        if isinstance(row, Mapping)
+    }
+    plan = build_plan(
+        fixtures,
+        repeats=repeats,
+        warmups=warmups,
+        run_id="synthetic-ci",
+    )
+    samples: list[dict[str, Any]] = []
+    for sample in plan:
+        row = by_id[sample.fixture_id]
+        mock = row.get("mock")
+        if not isinstance(mock, Mapping):
+            raise ValueError(f"synthetic fixture {sample.fixture_id!r} missing mock metrics")
+        metrics = mock.get(sample.mode)
+        if not isinstance(metrics, Mapping):
+            raise ValueError(
+                f"synthetic fixture {sample.fixture_id!r} missing {sample.mode} metrics"
+            )
+        samples.append(
+            {
+                "fixture_id": sample.fixture_id,
+                "family": sample.family,
+                "mode": sample.mode,
+                "repeat_index": sample.repeat_index,
+                "order_index": sample.order_index,
+                "is_warmup": sample.is_warmup,
+                "status": "complete",
+                **dict(metrics),
+            }
+        )
+    return {
+        "kind": "synthetic_ci",
+        "network_calls": 0,
+        "samples": samples,
+        "comparison": calculate_comparison(samples),
+    }
