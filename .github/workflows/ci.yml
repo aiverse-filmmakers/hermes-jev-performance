@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "phase-**", "docs/**"]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 
@@ -12,6 +12,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: agent
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
@@ -29,10 +31,12 @@ jobs:
           version: "0.15.20"
           args: "check --select E9,F"
       - name: Compile Python
-        run: python -m compileall -q __init__.py jevperf dashboard tests
+        run: python -m compileall -q __init__.py agent dashboard tests scripts
       - name: Check dashboard JavaScript
-        run: node --check dashboard/dist/index.js
+        run: node --check desktop/plugin.js && node --check dashboard/dist/index.js && node --check agent/dashboard/server-only.js
       - name: Public repository scan
         run: python scripts/public_repo_scan.py .
+      - name: Build and verify install packages
+        run: python scripts/build_release.py --output ${{ runner.temp }}/jevperf-release
       - name: Unit tests
         run: python -m unittest discover -s tests -v

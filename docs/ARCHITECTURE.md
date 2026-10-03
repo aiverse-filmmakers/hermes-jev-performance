@@ -256,7 +256,7 @@ Credential preference:
 Recommended settings:
 
 ```yaml
-mode: shadow
+mode: off
 provider: openrouter
 model: typesafe/jev-1.13
 min_confidence: 0.70
@@ -266,7 +266,7 @@ retention_days: 30
 telemetry_enabled: true
 ```
 
-These are the implemented Phase 6 defaults. First install uses `shadow` rather than silently enabling behavioral routing.
+These are the new-install defaults. Routing and compaction start `off`; upgrades preserve saved values. Users can deliberately select `shadow`, which sends Jev requests while leaving tool choices unchanged and may incur provider charges.
 
 ## 11. Telemetry storage
 

@@ -46,8 +46,9 @@ class DashboardAssetTests(unittest.TestCase):
         self.assertIn("summary.total_jev_cost_usd", source)
 
     def test_backend_declares_bounded_status_summary_and_mode_routes(self):
-        source = (ROOT / "dashboard" / "plugin_api.py").read_text(encoding="utf-8")
+        source = (ROOT / "agent" / "jevperf" / "plugin_api.py").read_text(encoding="utf-8")
         self.assertIn('@router.get("/status")', source)
+        self.assertIn('@router.get("/health")', source)
         self.assertIn('@router.get("/summary")', source)
         self.assertIn('@router.put("/mode")', source)
         self.assertIn("ge=1", source)

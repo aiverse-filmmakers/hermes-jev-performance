@@ -1,123 +1,43 @@
-# Hermes Jev Performance
+# Jev Performance for Hermes
 
-A Hermes-native Jev routing and observability plugin focused on one question:
+**Install Jev where Hermes runs. Add the visual dashboard only on the computer where you use Hermes Desktop.** The same official GitHub repository provides three setups:
 
-> Does Jev make Hermes faster, cheaper, and more efficient without reducing capability?
+| Your setup | What to install |
+|---|---|
+| Hermes runs on a VPS | [Install Server only](docs/INSTALL_SERVER.md) on the VPS. It contains the routing and compaction features, commands, and a small data API. It does not include the visual dashboard files. |
+| Hermes runs on a VPS and you want a dashboard | Install [Server only on the VPS](docs/INSTALL_SERVER.md), then [Desktop dashboard on your computer](docs/INSTALL_DESKTOP_WITH_VPS.md). Hermes Desktop uses the VPS connection you already have. |
+| Hermes and Hermes Desktop run on your computer | [Install both together](docs/INSTALL_LOCAL.md). |
 
-This project combines proven ideas from several MIT-licensed Jev/Hermes projects into one Hermes-native plugin:
+You can ask Hermes to do the server setup in ordinary language. For example, paste this into a chat connected to the VPS you intend to change:
 
-- [kerpopule/hermes-jev-skills](https://github.com/kerpopule/hermes-jev-skills) for Hermes plugin patterns, `/jev` controls, shadow mode, routing UX, and dashboard ideas.
-- [vinilana/jev-gateway](https://github.com/vinilana/jev-gateway) for observability, latency/cost/token metrics, and Jev ON vs OFF baseline comparison concepts.
-- [ourines/hermes-jev](https://github.com/ourines/hermes-jev) for Hermes-native Jev integration and OpenRouter Decisions API support.
-- [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) for the public Hermes plugin, middleware, slash-command, and dashboard extension APIs.
+> Install and enable the Server only component of Hermes Jev Performance from `aiverse-filmmakers/hermes-jev-performance/agent` on the backend and profile serving this chat. Tell me which machine and profile you will change, use Hermes' normal installer and security checks, and leave routing and compaction OFF. When finished, check that it installed correctly and explain any remaining setup in beginner-friendly language. Never ask me to paste a secret into chat.
 
-## Project status
+Or use the one-click [Server only install link](hermes://plugin/install?repo=aiverse-filmmakers/hermes-jev-performance/agent&enable=1) from Hermes Desktop, then confirm the target backend and profile in Hermes' dialog.
 
-**Active implementation. Routing and experimental recoverable compaction are implemented and tested against Hermes 0.21.5 source/runtime. Live OpenRouter and real-session gates remain pending. No stable release yet.**
+## What Jev does
 
-The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_OF_TRUTH.md).
+Jev can help Hermes choose relevant tool families and can optionally compact older tool outputs while keeping exact copies recoverable. Hermes continues to use your existing model, conversations, and gateway. New installations start with routing **OFF** and compaction **OFF**. **Shadow** sends Jev requests without changing tool choices and may incur provider charges.
 
-## v1 goals
+## Getting started safely
 
-- Hermes-native plugin. No proxy/gateway replacement.
-- Preserve the user's existing Hermes model/provider authentication.
-- Jev tool-family routing through OpenRouter.
-- Conservative routing with fail-open behavior.
-- `off`, `shadow`, and `on` modes.
-- Telegram/gateway-compatible `/jev` controls.
-- Local performance telemetry: Jev latency, confidence, cost, Hermes duration, tool calls, LLM calls, and token usage when exposed by Hermes.
-- Native Hermes dashboard tab.
-- Honest Jev ON vs OFF comparison and a controlled benchmark mode.
-- No prompt, tool argument, secret, or credential logging by default.
-- Experimental Jev-guided recoverable tool-output compaction through Hermes' native ContextEngine API.
+1. Install the component for your setup using one of the guides above.
+2. Run `/jev doctor` in a chat connected to the backend where the Server component was installed.
+3. Add the Jev/OpenRouter credential using that backend's secure credential settings. Never paste it into chat or the dashboard.
+4. Choose Shadow only when you are ready for provider requests and possible charges. Review the results before choosing On.
+5. To use recoverable compaction, select `hermes-jev-performance` as the Hermes context engine in the same profile and restart its agent. Start compaction in Shadow.
 
-## Non-goals for v1
+## Downloadable packages
 
-- Replacing Hermes' primary model.
-- Replacing Hermes' provider connection.
-- Acting as a generic OpenAI/Anthropic proxy.
-- Automatically changing model/provider routing.
-- Sending private telemetry to a hosted service.
-- Claiming a performance improvement without measured evidence.
+The [latest GitHub release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/latest) will provide separate Server only, Desktop dashboard, and combined downloads, plus file lists and checksums. Until a tested release appears there, use the official `main` install links above; Hermes will show the source and normal security prompt before installing.
 
-## Planned commands
+## Help and compatibility
 
-```text
-/jev
-/jev status
-/jev on
-/jev off
-/jev shadow
-/jev notice on
-/jev notice off
-/jev stats
-/jev doctor
-/jev compaction status
-/jev compaction shadow
-/jev compaction on
-/jev compaction off
-```
-
-Equivalent CLI controls are provided where Hermes' public plugin APIs support them.
-
-Controlled benchmark CLI:
-
-```text
-hermes jev benchmark
-hermes jev benchmark --live
-hermes jev benchmark --live --export ./benchmark.json
-```
-
-The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default workload fixtures are read-only and exclude public-web research. A live run still uses the configured Hermes model/provider, and ON samples also call OpenRouter Jev.
-
-Diagnostics:
-
-```text
-hermes jev doctor
-hermes jev doctor --json
-```
-
-Compaction is OFF by default. To activate it, set `context.engine: hermes-jev-performance` in the Hermes profile, restart Hermes, then use `/jev compaction shadow` first. The compactor archives exact old tool outputs in private profile storage and exposes `jev_recover` for paged recovery. Run the offline probe with `python3 scripts/benchmark_compaction.py`; add `--live` only when you intentionally want a paid synthetic Jev request.
-
-## Routing families
-
-The initial routing taxonomy is:
-
-```text
-github
-apps
-web
-terminal
-files
-memory
-skills
-media
-none
-multi
-none_of_these
-```
-
-`multi`, low-confidence decisions, unsupported conditions, and Jev failures must fall back to normal unrestricted Hermes behavior.
-
-## Documentation
-
-- [Source of truth](docs/SOURCE_OF_TRUTH.md)
-- [Install, upgrade and uninstall](docs/INSTALL.md)
-- [Compatibility matrix](docs/COMPATIBILITY.md)
-- [Product requirements](docs/PRD.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Implementation roadmap](docs/ROADMAP.md)
-- [Telemetry and benchmarking](docs/TELEMETRY.md)
-- [Controlled benchmark](docs/BENCHMARK.md)
-- [Testing strategy](docs/TESTING.md)
-- [Jev decision audit](docs/JEV_DECISION_AUDIT.md)
+- [Server only setup](docs/INSTALL_SERVER.md)
+- [Desktop dashboard for a VPS](docs/INSTALL_DESKTOP_WITH_VPS.md)
+- [Both components on a local computer](docs/INSTALL_LOCAL.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Compatibility](docs/COMPATIBILITY.md)
+- [Current verification status](docs/STATUS.md)
 - [Security and privacy](docs/SECURITY.md)
-- [Upstream projects and provenance](docs/UPSTREAMS.md)
-- [Architecture decisions](docs/DECISIONS.md)
-- [Current implementation status](docs/STATUS.md)
 
-## License
-
-MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-This is an independent community project and is not affiliated with or endorsed by Nous Research, TypeSafe, OpenRouter, or the upstream projects.
+This is an independent community project, not an official Hermes or OpenRouter product. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).

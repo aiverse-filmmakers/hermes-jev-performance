@@ -3,7 +3,7 @@ version: 0.1.0-alpha.8
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
-description: Hermes-native Jev tool routing and performance observability.
+description: Jev routing, recoverable compaction, and performance data API for Hermes.
 license: MIT
 homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
 tags: [jev, routing, compaction, observability, performance, openrouter]

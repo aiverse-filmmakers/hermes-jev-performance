@@ -10,6 +10,8 @@ requires_hermes: ">=0.21.5"
 
 Hermes 0.21.5 is the declared minimum because the required v1 plugin surfaces are documented and available on that release line.
 
+The agent plugin's backend API works with the native Hermes Desktop component through the selected gateway connection. The Desktop panel itself requires a Hermes Desktop build that supports the public Desktop Plugin SDK and plugin install links. The source and package contracts were checked against Hermes 0.21.5+5279.g4e74031, but a branded Desktop installer and visual end-to-end run have not yet been verified. See [current status](STATUS.md) before treating this as a supported production release.
+
 ## Python
 
 | Python | Status |

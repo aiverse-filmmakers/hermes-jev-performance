@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from . import __version__
@@ -12,11 +11,12 @@ from .benchmark_export import build_anonymized_export
 from .config import VALID_MODES, ConfigSnapshot, read_config
 from .compaction_config import read_compaction_config
 from .compaction_metrics import compaction_summary
+from .credentials import resolve_openrouter_credential
+from .package_paths import PLUGIN_ROOT
 from .store import MetricsStore, SCHEMA_VERSION, StatsSummary, default_db_path
 
 
 PLUGIN_ID = "hermes-jev-performance"
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 
 _SAFE_BENCHMARK_METHODOLOGY_KEYS = (
     "kind",
@@ -167,6 +167,49 @@ def status_payload(
                        "drop_confidence": compaction.drop_confidence,
                        "warnings": list(compaction.warnings), "summary_24h": compaction_metrics,
                        "engine_selection_required": True},
+    }
+
+
+def health_payload(*, field_loader: Callable[..., Any] | None = None) -> dict[str, Any]:
+    """Return setup readiness only; never return a credential or transcript data."""
+    config = read_dashboard_config(field_loader)
+    compaction = read_compaction_config(_MappingContext(_settings_values(field_loader)))
+    credential_present = resolve_openrouter_credential() is not None
+    try:
+        from hermes_cli.config import load_config_readonly
+
+        host_config = load_config_readonly() or {}
+        configured_engine = (host_config.get("context") or {}).get("engine")
+        if not isinstance(configured_engine, str) or not configured_engine.strip():
+            configured_engine = None
+        else:
+            configured_engine = configured_engine.strip()
+    except Exception:
+        configured_engine = None
+
+    issues: list[str] = []
+    if not credential_present:
+        issues.append("credential_missing")
+    if compaction.mode != "off" and configured_engine != "hermes-jev-performance":
+        issues.append("context_engine_not_selected")
+    return {
+        "plugin_id": PLUGIN_ID,
+        "backend_version": __version__,
+        "api_schema_version": 1,
+        "routing_mode": config.mode,
+        "compaction_mode": compaction.mode,
+        "credential_present": credential_present,
+        "context_engine": {
+            "configured": configured_engine,
+            "active": None,
+            "restart_required": None,
+        },
+        "capabilities": {
+            "routing_mode_write": True,
+            "compaction_mode_write": True,
+            "context_engine_setup": False,
+        },
+        "setup_issues": issues,
     }
 
 

@@ -5,7 +5,9 @@ from pathlib import Path
 
 from jevperf.dashboard_service import (
     PLUGIN_ID,
+    PLUGIN_ROOT,
     read_dashboard_config,
+    health_payload,
     set_dashboard_mode,
     status_payload,
     summary_payload,
@@ -85,6 +87,22 @@ class DashboardServiceTests(unittest.TestCase):
         serialized = repr(payload)
         self.assertNotIn(str(store.path), serialized)
         self.assertNotIn("plugin-data", serialized)
+
+    def test_health_payload_is_safe_and_reports_only_setup_state(self):
+        settings = SettingsHarness(mode="off", compaction_mode="off")
+        from unittest import mock
+
+        with mock.patch("jevperf.dashboard_service.resolve_openrouter_credential", return_value=None):
+            payload = health_payload(field_loader=settings.loader)
+        self.assertEqual(payload["plugin_id"], PLUGIN_ID)
+        self.assertEqual(payload["api_schema_version"], 1)
+        self.assertEqual(payload["routing_mode"], "off")
+        self.assertFalse(payload["credential_present"])
+        self.assertEqual(payload["context_engine"]["active"], None)
+        self.assertFalse(payload["capabilities"]["context_engine_setup"])
+        self.assertIn("credential_missing", payload["setup_issues"])
+        self.assertNotIn("token", repr(payload).lower())
+        self.assertEqual(settings.last_plugin_root, PLUGIN_ROOT)
 
     def test_summary_is_aggregate_only(self):
         store = self.make_store()

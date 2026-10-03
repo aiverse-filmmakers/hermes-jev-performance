@@ -7,3 +7,4 @@ htmlcov/
 *.sqlite3
 .env
 .venv/
+dist/releases/

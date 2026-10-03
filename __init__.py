@@ -4,7 +4,7 @@ Also exposes the native ContextEngine through register_context_engine when suppo
 Selecting it remains an explicit Hermes context.engine setting.
 """
 
-from .jevperf.plugin import register_plugin
+from .agent.jevperf.plugin import register_plugin
 
 
 def register(ctx) -> None:

@@ -1,0 +1,43 @@
+{
+  "suite_version": 1,
+  "description": "Read-only local Hermes benchmark fixtures. Network fixture is opt-in.",
+  "fixtures": [
+    {
+      "id": "none-explain-recursion",
+      "family": "none",
+      "prompt": "Explain recursion in exactly one sentence. Do not use any tools.",
+      "read_only": true,
+      "requires_network": false
+    },
+    {
+      "id": "terminal-python-version",
+      "family": "terminal",
+      "prompt": "Use the terminal to run python3 --version and reply with the exact version output. Do not modify files or system state.",
+      "read_only": true,
+      "requires_network": false
+    },
+    {
+      "id": "files-read-readme-heading",
+      "family": "files",
+      "prompt": "Read README.md in the current working directory and reply with only its first Markdown heading. Do not modify any file.",
+      "read_only": true,
+      "requires_network": false,
+      "validation_contains": "Hermes Jev Performance"
+    },
+    {
+      "id": "skills-inspect-availability",
+      "family": "skills",
+      "prompt": "Use the Hermes skill discovery tools to check whether a skill named github-operations is available. Do not create, edit, or delete any skill.",
+      "read_only": true,
+      "requires_network": false
+    },
+    {
+      "id": "web-official-hermes-repo",
+      "family": "web",
+      "prompt": "Search the public web for the official NousResearch Hermes Agent GitHub repository and report only the repository owner/name. Read-only web research only.",
+      "read_only": true,
+      "requires_network": true,
+      "validation_contains": "NousResearch/hermes-agent"
+    }
+  ]
+}

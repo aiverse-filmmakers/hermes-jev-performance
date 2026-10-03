@@ -19,8 +19,10 @@ def main():
     source = args.hermes_source.resolve()
     if not (source / "agent" / "context_engine.py").is_file():
         parser.error("Hermes source must contain agent/context_engine.py")
+    repository_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(source))
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.append(str(repository_root))
+    sys.path.append(str(repository_root / "agent"))
     sys.dont_write_bytecode = True
     with tempfile.TemporaryDirectory() as temp, mock.patch.dict(os.environ, {
             "HERMES_HOME": str(Path(temp).resolve()), "HERMES_DISABLE_LAZY_INSTALLS": "1"}):

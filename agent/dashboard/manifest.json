@@ -1,0 +1,14 @@
+{
+  "name": "hermes-jev-performance",
+  "label": "Jev Performance backend API",
+  "description": "Backend data API for the native Jev Performance Desktop plugin.",
+  "icon": "Activity",
+  "version": "0.1.0-alpha.8",
+  "tab": {
+    "path": "/jev-performance",
+    "hidden": true
+  },
+  "slots": [],
+  "entry": "server-only.js",
+  "api": "plugin_api.py"
+}

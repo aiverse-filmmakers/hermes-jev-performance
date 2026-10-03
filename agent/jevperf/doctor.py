@@ -32,7 +32,7 @@ from .store import (
 )
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+from .package_paths import PLUGIN_ROOT
 
 
 @dataclass(frozen=True)
@@ -59,8 +59,6 @@ def _dashboard_check(root: Path) -> DoctorCheck:
     required = (
         root / "dashboard" / "manifest.json",
         root / "dashboard" / "plugin_api.py",
-        root / "dashboard" / "dist" / "index.js",
-        root / "dashboard" / "dist" / "style.css",
     )
     missing = [path.relative_to(root).as_posix() for path in required if not path.is_file()]
     if missing:
@@ -71,7 +69,14 @@ def _dashboard_check(root: Path) -> DoctorCheck:
         return _check("dashboard_assets", "fail", "dashboard manifest is unreadable")
     if manifest.get("name") != "hermes-jev-performance":
         return _check("dashboard_assets", "fail", "dashboard manifest plugin id mismatch")
-    return _check("dashboard_assets", "pass", "manifest, backend and pre-built assets present")
+    web_assets = (root / "dashboard" / "dist" / "index.js", root / "dashboard" / "dist" / "style.css")
+    if all(path.is_file() for path in web_assets):
+        return _check("dashboard_assets", "pass", "manifest, backend and optional web dashboard assets present")
+    shim = root / "dashboard" / "server-only.js"
+    tab = manifest.get("tab") if isinstance(manifest.get("tab"), dict) else {}
+    if tab.get("hidden") is True and shim.is_file():
+        return _check("dashboard_assets", "pass", "server API present; visual dashboard omitted")
+    return _check("dashboard_assets", "warn", "server API present; no web dashboard assets are installed")
 
 
 def _fixture_check(path: Path) -> DoctorCheck:

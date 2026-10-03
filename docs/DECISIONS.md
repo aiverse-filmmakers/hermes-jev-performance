@@ -82,13 +82,13 @@ Ship dashboard assets inside the same Hermes plugin directory using Hermes' supp
 
 **Why:** gateway portability and less maintenance.
 
-## ADR-011 - First install defaults to Shadow
+## ADR-011 - Fresh installs start with routing Off
 
-**Status:** Accepted
+**Status:** Superseded by ADR-019
 
-First-run mode is `shadow`, not `on`.
+Earlier releases defaulted to `shadow`. Split-install releases default new profiles to `off`; an upgrade keeps its saved mode.
 
-**Why:** lets users observe decisions before enabling behavioral changes. Phase 1 confirmed this default in the validated configuration contract.
+**Why:** Shadow sends paid provider requests. A new install must require an explicit choice before making those requests.
 
 ## ADR-012 - Controlled benchmark separated from organic analytics
 
@@ -114,3 +114,11 @@ The live benchmark passes OFF/ON through validated benchmark-only environment co
 ON-mode family filtering removes known competing eager tool schemas, but always preserves Hermes' `tool_search` / `tool_describe` / `tool_call` bridge (including provider aliases such as `hermes_tool_search`).
 
 **Why:** current public `llm_request` middleware can replace the model-facing request tool array, but it cannot safely re-scope the underlying deferred-tool catalog after Tool Search assembly. Removing the bridge can make a correctly routed request lose access to a deferred tool that belongs to the chosen family, such as an installed GitHub plugin or a deferred media tool. Jev routing is a performance optimization, not an authorization boundary, so capability preservation takes priority over hard isolation of deferred tools.
+
+## ADR-019 - Separate server and Desktop install targets
+
+**Status:** Accepted
+
+The repository provides a Server only package, a native Desktop dashboard package, and a combined local package. Fresh installs start with routing and compaction Off; upgrades retain saved user modes. The server package omits visual dashboard bundles and carries only the hidden entry needed by Hermes' browser dashboard loader to mount the authenticated API.
+
+**Why:** VPS users should install the agent where Hermes runs without copying unnecessary UI assets, while the local Hermes Desktop panel can manage the selected authenticated connection. One repository and plugin identity keep community setup and future updates understandable.

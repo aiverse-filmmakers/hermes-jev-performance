@@ -27,7 +27,7 @@ from .credentials import resolve_openrouter_credential
 from .store import MetricsStore, default_db_path
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+from .package_paths import PLUGIN_ROOT
 DEFAULT_FIXTURE_PATH = PLUGIN_ROOT / "benchmarks" / "fixtures" / "readonly_local.json"
 _VERSION_RE = re.compile(r"Hermes Agent v([A-Za-z0-9.+_-]+)")
 

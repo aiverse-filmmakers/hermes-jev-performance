@@ -13,7 +13,7 @@ from .benchmark_context import read_benchmark_mode
 
 VALID_MODES = frozenset({"off", "shadow", "on"})
 
-DEFAULT_MODE = "shadow"
+DEFAULT_MODE = "off"
 DEFAULT_PROVIDER = "openrouter"
 DEFAULT_MODEL = "typesafe/jev-1.13"
 DEFAULT_MIN_CONFIDENCE = 0.70

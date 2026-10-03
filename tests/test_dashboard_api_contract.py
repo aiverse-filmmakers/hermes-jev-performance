@@ -8,7 +8,7 @@ from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-PLUGIN_API = ROOT / "dashboard" / "plugin_api.py"
+PLUGIN_API = ROOT / "agent" / "jevperf" / "plugin_api.py"
 
 
 class FakeHTTPException(Exception):
@@ -87,6 +87,7 @@ class DashboardApiContractTests(unittest.TestCase):
             routes,
             {
                 ("GET", "/status"),
+                ("GET", "/health"),
                 ("GET", "/summary"),
                 ("GET", "/analytics"),
                 ("GET", "/benchmarks"),
@@ -98,7 +99,7 @@ class DashboardApiContractTests(unittest.TestCase):
 
     def test_every_backend_route_enforces_selected_profile_scope(self):
         source = PLUGIN_API.read_text(encoding="utf-8")
-        self.assertEqual(source.count("_ensure_profile_scope(profile)"), 7)
+        self.assertEqual(source.count("_ensure_profile_scope(profile)"), 8)
 
     def test_named_profile_is_allowed_when_host_scope_matches(self):
         module = load_api_module()
@@ -175,6 +176,18 @@ class DashboardApiContractTests(unittest.TestCase):
         module.status_payload = failed
         with self.assertRaises(FakeHTTPException) as caught:
             asyncio.run(module.get_status())
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
+
+    def test_health_failure_does_not_leak_exception_text(self):
+        module = load_api_module()
+
+        def failed():
+            raise RuntimeError("PRIVATE_INTERNAL_DETAIL")
+
+        module.health_payload = failed
+        with self.assertRaises(FakeHTTPException) as caught:
+            asyncio.run(module.get_health())
         self.assertEqual(caught.exception.status_code, 503)
         self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
 

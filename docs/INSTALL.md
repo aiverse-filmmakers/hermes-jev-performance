@@ -1,201 +1,45 @@
-# Install, Upgrade, Disable, Uninstall
+# Install, update, and remove Jev Performance
 
-Hermes Jev Performance uses Hermes' native plugin lifecycle. It does not require a custom installer and does not patch Hermes core files.
+Pick the install that matches where Hermes runs. The backend component belongs on the machine running Hermes. The optional native dashboard belongs on the computer running Hermes Desktop.
 
-## Requirements
+- [Server only (VPS or local backend)](INSTALL_SERVER.md)
+- [Desktop dashboard connected to a VPS](INSTALL_DESKTOP_WITH_VPS.md)
+- [Both components on one local computer](INSTALL_LOCAL.md)
 
-- Hermes Agent **0.21.5 or newer**.
-- Python in the plugin's tested range: **3.11 through 3.14**.
-- OpenRouter access for SHADOW/ON routing.
-- Either:
-  - `OPENROUTER_JEV_API_TOKEN` (preferred dedicated Jev credential), or
-  - `OPENROUTER_API_KEY` (compatibility fallback).
+## First setup
 
-OFF mode works without an OpenRouter credential.
+New installs start with routing and recoverable compaction **OFF**. Confirm the target machine/profile in Hermes' installer. Run `/jev doctor` on that backend when installation finishes. Add the Jev/OpenRouter credential through Hermes' secure settings on the backend that will call Jev; do not put secrets into chat or the dashboard. Shadow sends requests and may incur provider charges, even though it leaves the tool choices unchanged.
 
-## Recommended install
+Compaction needs a separate Hermes profile setting: select `hermes-jev-performance` as `context.engine`, restart the agent, and check `/jev compaction status`. Begin in Shadow.
 
-From the public GitHub repository:
+## Optional command-line controls
 
-```bash
+These are for people comfortable with a terminal. Beginners can use Hermes Desktop or ask Hermes to install the server component in normal language.
+
+```sh
+hermes plugins install aiverse-filmmakers/hermes-jev-performance/agent --enable
+hermes plugins doctor hermes-jev-performance --ci
+hermes jev doctor
+```
+
+For a local backend and its Desktop app, install the root combined package instead:
+
+```sh
 hermes plugins install aiverse-filmmakers/hermes-jev-performance --enable
 ```
 
-Hermes owns the clone, install metadata, activation and dependency admission.
+To update or remove the backend component, use Hermes' Plugins screen or run:
 
-For reproducible production installs, pin a full 40-character commit:
-
-```bash
-hermes plugins install aiverse-filmmakers/hermes-jev-performance --enable --ref <FULL_COMMIT_SHA>
-```
-
-A pinned plugin does not move during normal `hermes plugins update`. To move a pin, explicitly reinstall with `--force --ref <NEW_FULL_COMMIT_SHA>`.
-
-## First checks
-
-```bash
-hermes plugins doctor hermes-jev-performance --ci
-hermes jev status
-hermes jev doctor
-```
-
-The plugin defaults to SHADOW on first install.
-
-SHADOW calls Jev and records routing telemetry but does not change Hermes' eager tool list.
-
-## Try recoverable compaction
-
-Compaction is off by default. Add this to the Hermes profile configuration and restart Hermes:
-
-```yaml
-context:
-  engine: hermes-jev-performance
-```
-
-Then start with:
-
-```text
-/jev compaction status
-/jev compaction shadow
-```
-
-SHADOW leaves the transcript unchanged while exercising the decision path. To apply compaction after reviewing the status output, use `/jev compaction on`. Old tool outputs are archived privately and can be recovered through the `jev_recover` tool exposed to the agent. Disable it at any time with `/jev compaction off`.
-
-The offline synthetic check is safe to run without credentials:
-
-```bash
-python3 scripts/benchmark_compaction.py
-```
-
-Add `--live` only when you intentionally want a paid OpenRouter Jev request.
-
-## Enable / disable
-
-Enable:
-
-```bash
-hermes plugins enable hermes-jev-performance
-```
-
-Disable without deleting:
-
-```bash
-hermes plugins disable hermes-jev-performance
-```
-
-Disabling the plugin is the cleanest rollback. Hermes removes the plugin's runtime registrations through its own plugin lifecycle. No Hermes core rollback is required.
-
-## Routing mode vs plugin disable
-
-These are different controls:
-
-```text
-/jev off
-```
-
-keeps the plugin loaded but makes zero Jev routing calls. Local baseline telemetry may continue.
-
-```bash
-hermes plugins disable hermes-jev-performance
-```
-
-unloads/disables the plugin itself through Hermes.
-
-## Upgrade
-
-For an unpinned git install:
-
-```bash
-hermes plugins check-updates
+```sh
 hermes plugins update hermes-jev-performance
-```
-
-Then validate:
-
-```bash
-hermes plugins doctor hermes-jev-performance --ci
-hermes jev doctor
-```
-
-Telemetry schema upgrades are forward migrations. Current schema is v4.
-
-## Roll back
-
-Preferred rollback:
-
-1. Disable the plugin.
-2. Install or re-pin the previously known-good full commit.
-3. Run Hermes plugin doctor.
-4. Re-enable only after validation.
-
-Example:
-
-```bash
 hermes plugins disable hermes-jev-performance
-hermes plugins install aiverse-filmmakers/hermes-jev-performance --force --ref <PREVIOUS_FULL_COMMIT_SHA>
-hermes plugins doctor hermes-jev-performance --ci
-hermes plugins enable hermes-jev-performance
-```
-
-Do not edit Hermes core files to roll this plugin back.
-
-## Telemetry database recovery
-
-If diagnostics report a corrupt local metrics database, routing still fails open independently of telemetry.
-
-Inspect first:
-
-```bash
-hermes jev doctor
-```
-
-Before repairing, stop any other Hermes gateway, dashboard, agent, or automation process that uses the same profile. Repair renames the SQLite database and its WAL/SHM companions, so it must not race another writer.
-
-Then run a one-off CLI repair:
-
-```bash
-hermes jev doctor --repair-db
-hermes jev doctor
-```
-
-After doctor reports a healthy schema, restart the normal Hermes services for that profile.
-
-Repair affects only this plugin's local telemetry database. It does not touch Hermes conversations, configuration, credentials or other plugin data. Repair is never automatic.
-
-## Uninstall
-
-Remove the plugin through Hermes:
-
-```bash
 hermes plugins remove hermes-jev-performance
 ```
 
-Hermes removes the installed plugin directory and its install metadata.
+The Desktop dashboard is updated or removed through its own Hermes Desktop plugin controls. Removing that local dashboard does not remove the server plugin from a VPS. Removing the server plugin may leave its metrics and recoverable archive data in Hermes profile storage; delete that data separately only if you intentionally want to discard it.
 
-Local metrics under the profile's plugin-data directory may be retained independently for safety/history depending on Hermes/profile lifecycle behavior. If a user wants those metrics removed too, they should inspect the profile-local plugin-data location first and delete it deliberately rather than using a repository-provided destructive script.
+## Existing installation
 
-## Verify normal Hermes operation after disable/uninstall
+If you installed the earlier combined package on a VPS, install the Server only source at `aiverse-filmmakers/hermes-jev-performance/agent` through Hermes' plugin installer. Keep the same plugin name and profile. Check `/jev status` and `/jev doctor` afterward. The plugin stores metrics and archives in profile data, separate from the source folder; the upgrade should retain those files. If Hermes reports a source conflict, follow its displayed update/reinstall steps and verify data remains before removing any old directory manually.
 
-Run a normal Hermes request and:
-
-```bash
-hermes plugins list
-```
-
-The plugin must not be enabled after disable, and must not be present after remove.
-
-No Hermes provider/model/auth rollback is needed because this project never replaces those paths.
-
-## Live release gate
-
-Before public beta, run the batched real-environment gate instead of testing lifecycle steps one-by-one:
-
-```bash
-python3 scripts/live_release_gate.py --lifecycle --ref <FULL_COMMIT_SHA>
-```
-
-Add `--live-jev` for one explicit OpenRouter Jev call and `--active-agent` only when real active-profile Hermes turns are acceptable.
-
-The lifecycle portion uses a temporary isolated `HERMES_HOME`, so clean install, disable, re-enable and removal do not touch the live Telegram profile.
-
-See [`LIVE_RELEASE_GATE.md`](LIVE_RELEASE_GATE.md) for the full procedure.
+See [Troubleshooting](TROUBLESHOOTING.md) for connection, install, and setup issues.
