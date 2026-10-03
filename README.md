@@ -28,7 +28,7 @@ Jev can help Hermes choose relevant tool families and can optionally compact old
 
 ## Downloadable packages
 
-The [latest GitHub release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/latest) will provide separate Server only, Desktop dashboard, and combined downloads, plus file lists and checksums. Until a tested release appears there, use the official `main` install links above; Hermes will show the source and normal security prompt before installing.
+Separate Server only, Desktop dashboard, and combined ZIPs with file lists and checksums are built and verified during development. They are not published as a GitHub release yet. For now, use the official install links above; Hermes will show the source and its normal security prompt before installing.
 
 ## Help and compatibility
 
