@@ -35,7 +35,7 @@ RULES = (
     ("telegram_bot_token", re.compile(r"\b\d{8,12}:[A-Za-z0-9_-]{30,}\b")),
     ("linux_user_path", re.compile(r"(?<![A-Za-z0-9_])/home/[A-Za-z0-9._-]+/")),
     ("mac_user_path", re.compile(r"(?<![A-Za-z0-9_])/Users/[A-Za-z0-9._-]+/")),
-    ("windows_user_path", re.compile(r"(?i)\b[A-Z]:\\\\Users\\\\[^\\\\\r\n]+\\\\")),
+    ("windows_user_path", re.compile(r"(?i)\b[A-Z]:\\Users\\[^\\\r\n]+\\")),
 )
 
 EMAIL_RE = re.compile(
