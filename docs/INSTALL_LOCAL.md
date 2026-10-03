@@ -10,8 +10,8 @@ Use this when the Hermes backend and Hermes Desktop are both on the same compute
 
 The first installation leaves routing and compaction OFF. Use the setup checklist to configure the Jev credential securely on this computer. Shadow makes Jev provider requests and may incur charges. Compaction additionally requires selecting the plugin as the Hermes `context.engine` and restarting the agent.
 
-If Hermes cannot open the combined install link, go to the [official repository](https://github.com/aiverse-filmmakers/hermes-jev-performance) and follow its Install both on this computer guide. Use a Hermes Desktop version that supports plugin installation from Git.
+If Hermes cannot open the combined install link, use Hermes' normal plugin installation instructions or ask Hermes to install the combined plugin from the official repository. This guide's terminal option is for people comfortable with command-line setup.
 
 To switch to a VPS later, install the Server only component on that VPS and keep the Desktop component on this computer. The dashboard follows the connection selected in Hermes Desktop.
 
-If the app does not detect both components, stop and check that the repository's `main` release contains `plugin.yaml`, `__init__.py`, and `desktop/plugin.js`; do not install the repository folder into the Desktop-only plugins directory by hand.
+If the app does not detect both components, stop and check that the official repository contains `agent/plugin.yaml` and `desktop/plugin.js`. Do not put the combined repository folder into the Desktop-only plugins directory by hand.

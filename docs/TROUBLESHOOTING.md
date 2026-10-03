@@ -2,7 +2,7 @@
 
 ## I cannot find the install button
 
-Hermes Desktop versions differ. Open the official install link for the component you need. On supported versions it opens an install confirmation. If the link does nothing, use **Plugins → Install from Git** if available, or update Hermes Desktop. Don't put the Python agent package into the Desktop plugins folder.
+Open the official install link for the component you need. If a Desktop link does nothing, follow the no-terminal [manual Desktop install steps](INSTALL_DESKTOP_WITH_VPS.md#if-the-install-link-does-not-open). They use **Settings → Plugins → Open plugins folder** and **Rescan**. Put only the Desktop `plugin.js` file in that folder; do not put the Python agent package there.
 
 ## The Desktop panel is installed but says the backend is missing
 
