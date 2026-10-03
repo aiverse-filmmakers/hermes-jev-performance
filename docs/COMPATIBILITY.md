@@ -36,6 +36,22 @@ Python versions outside 3.11-3.14 are not currently claimed as tested.
 
 Feature detection is authoritative. Version metadata is supporting evidence, not a substitute for checking the actual public surfaces.
 
+## Dashboard profile isolation
+
+The dashboard carries the selected Hermes profile in every plugin API request.
+
+Newer Hermes hosts scope plugin API requests to that profile before the plugin handler runs. Hermes 0.21.5 has profile identity helpers but does not automatically apply the selected management profile to third-party plugin API routers.
+
+To keep the declared 0.21.5 floor safe, every Jev dashboard backend route verifies that a named selected profile matches Hermes' effective `HERMES_HOME` for that request. Therefore:
+
+- correctly profile-scoped hosts work normally;
+- a dashboard directly serving the selected profile works normally on 0.21.5;
+- an unsafe cross-profile request on a host that did not scope the plugin route fails closed with HTTP 409 before telemetry is read or settings are written;
+- an unknown profile fails with a safe HTTP 404;
+- the plugin does not import Hermes private profile-scope internals.
+
+This makes wrong-profile access a hard failure rather than silently falling back to whichever profile the dashboard process launched with.
+
 ## Compatibility states
 
 ### Supported
@@ -65,6 +81,6 @@ Before public beta, the release gate still requires live smoke validation on:
 1. Hermes 0.21.5 release line.
 2. The current supported Hermes stable release at beta time.
 
-For each live row: plugin install, plugin doctor/import, SHADOW request, ON clear-family request, OFF zero-Jev request, Telegram/gateway control, dashboard discovery/API, controlled benchmark preview, disable, re-enable, remove/uninstall, and a normal Hermes request after removal.
+For each live row: plugin install, plugin doctor/import, SHADOW request, ON clear-family request, OFF zero-Jev request, Telegram/gateway control, dashboard discovery/API, selected-profile isolation behavior, controlled benchmark preview, disable, re-enable, remove/uninstall, and a normal Hermes request after removal.
 
 Until those live rows are actually run, this document does not claim they passed.
