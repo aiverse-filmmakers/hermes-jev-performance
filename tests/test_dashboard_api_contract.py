@@ -130,9 +130,11 @@ class DashboardApiContractTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 503)
         self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
 
-    def test_bundle_uses_host_authenticated_transport_for_mode_write(self):
+    def test_bundle_uses_host_authenticated_profile_scoped_transport_for_mode_write(self):
         source = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
-        self.assertIn('SDK.fetchJSON(API + "/mode"', source)
+        self.assertIn('new URLSearchParams(window.location.search).get("profile")', source)
+        self.assertIn('SDK.fetchJSON(apiUrl("/mode"), {', source)
+        self.assertIn('profile=" + encodeURIComponent(profile)', source)
         self.assertIn('method: "PUT"', source)
         self.assertNotIn("window.__HERMES_SESSION_TOKEN__", source)
         self.assertNotIn("document.cookie", source)
@@ -160,6 +162,7 @@ class DashboardApiContractTests(unittest.TestCase):
             asyncio.run(module.get_benchmarks(limit=10))
         self.assertEqual(caught.exception.status_code, 503)
         self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
+
 
 if __name__ == "__main__":
     unittest.main()
