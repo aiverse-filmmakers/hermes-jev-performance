@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from typing import Any
 
 from .benchmark_export import write_anonymized_export
 from .benchmark_runner import benchmark_plan_summary, run_live_benchmark
 from .commands import render_stats, render_status, set_mode, set_notice
+from .doctor import render_doctor, run_doctor
+from .smoke import run_smoke
 
 
 def _fmt_delta(metric: dict[str, Any]) -> str:
@@ -30,6 +33,18 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         sub.add_parser("off", help="Disable Jev routing.")
         sub.add_parser("shadow", help="Run Jev decisions without changing Hermes tools.")
         sub.add_parser("stats", help="Show local Jev/Hermes performance stats.")
+        sub.add_parser(
+            "smoke",
+            help="Explicitly make one live OpenRouter Jev Decisions API call.",
+        )
+
+        doctor = sub.add_parser("doctor", help="Run local Jev diagnostics without network calls.")
+        doctor.add_argument("--json", action="store_true", help="Print machine-readable diagnostic JSON.")
+        doctor.add_argument(
+            "--repair-db",
+            action="store_true",
+            help="Quarantine a corrupt local metrics DB and create a clean schema.",
+        )
 
         notice = sub.add_parser("notice", help="Control concise reply notices.")
         notice.add_argument("state", choices=("on", "off"))
@@ -70,6 +85,20 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         if action == "stats":
             print(render_stats(telemetry))
             return 0
+        if action == "smoke":
+            code, payload = run_smoke()
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return code
+        if action == "doctor":
+            report = run_doctor(
+                ctx,
+                repair_db=bool(getattr(args, "repair_db", False)),
+            )
+            if bool(getattr(args, "json", False)):
+                print(json.dumps(report, sort_keys=True))
+            else:
+                print(render_doctor(report))
+            return 1 if report.get("overall") == "fail" else 0
         if action == "notice":
             state = str(getattr(args, "state", "") or "").lower()
             print(set_notice(ctx, state == "on"))
@@ -94,7 +123,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print(f"Measured repeats: {plan['repeats']}")
                 print(f"Total Hermes turns: {plan['total_turns']}")
                 print(f"Measured turns: {plan['measured_turns']}")
-                print(f"Network fixture: {'included' if plan['network_included'] else 'excluded'}")
+                print(f"Public-web workload fixture: {'included' if plan['public_web_fixture_included'] else 'excluded'}")
                 print("Order: paired alternating OFF/ON")
                 print("No benchmark was run. Add --live to execute paid/local Hermes turns.")
                 return 0
@@ -119,6 +148,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             print(f"Benchmark run: {run['run_id']}")
             print(f"Status: {run['status']}")
             print(f"Matched pairs: {comparison['matched_pairs']}")
+            print(f"Invalid ON routing samples: {comparison['invalid_routing_samples']['on']}")
             for key, label in (
                 ("hermes_duration_ms", "Hermes duration"),
                 ("tool_calls", "Tool calls"),
@@ -138,7 +168,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                 print(f"Export: {written}")
             return 0
 
-        print("Usage: hermes jev {status|on|off|shadow|stats|notice|benchmark}")
+        print("Usage: hermes jev {status|on|off|shadow|stats|smoke|doctor|notice|benchmark}")
         return 2
 
     return setup, handler

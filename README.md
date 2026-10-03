@@ -13,7 +13,7 @@ This project combines proven ideas from several MIT-licensed Jev/Hermes projects
 
 ## Project status
 
-**Active implementation. Phases 1-8 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
+**Active implementation. Phases 1-9 are implemented in code; live Hermes/OpenRouter integration gates are pending. No stable release yet.**
 
 The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_OF_TRUTH.md).
 
@@ -50,6 +50,7 @@ The canonical implementation plan is in [`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_
 /jev notice on
 /jev notice off
 /jev stats
+/jev doctor
 ```
 
 Equivalent CLI controls are provided where Hermes' public plugin APIs support them.
@@ -62,7 +63,14 @@ hermes jev benchmark --live
 hermes jev benchmark --live --export ./benchmark.json
 ```
 
-The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default suite is read-only and network-free.
+The first command is preview-only. `--live` is explicitly required before any matched Hermes/OpenRouter benchmark turns run. The default workload fixtures are read-only and exclude public-web research. A live run still uses the configured Hermes model/provider, and ON samples also call OpenRouter Jev.
+
+Diagnostics:
+
+```text
+hermes jev doctor
+hermes jev doctor --json
+```
 
 ## Routing families
 
@@ -86,6 +94,8 @@ multi
 ## Documentation
 
 - [Source of truth](docs/SOURCE_OF_TRUTH.md)
+- [Install, upgrade and uninstall](docs/INSTALL.md)
+- [Compatibility matrix](docs/COMPATIBILITY.md)
 - [Product requirements](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation roadmap](docs/ROADMAP.md)

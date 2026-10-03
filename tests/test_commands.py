@@ -15,6 +15,9 @@ class FakeStats:
     fallback = 2
     avg_confidence = 0.91
     avg_jev_latency_ms = 412.3
+    p50_jev_latency_ms = 400
+    p95_jev_latency_ms = 700
+    avg_jev_cost_usd = 0.0000122
     total_jev_cost_usd = 0.000061
     avg_turn_duration_ms = 14250
     avg_tool_calls = 2.5
@@ -40,8 +43,21 @@ class CommandTests(unittest.TestCase):
     def test_empty_command_is_status(self):
         result = handle_jev_command(FakeContext(), "")
         self.assertIn("Hermes Jev Performance", result)
-        self.assertIn("Phase: 6 (controls + telemetry)", result)
-        self.assertIn("Last route: none yet", result)
+        self.assertIn("Phase: 9 (hardening + packaging)", result)
+
+    def test_status_never_exposes_process_global_route_metadata(self):
+        class Middleware:
+            last_filter_reason = "filtered"
+            class Decision:
+                family = "private-family"
+                confidence = 0.99
+                reason = "accepted"
+            last_decision = Decision()
+
+        result = render_status(FakeContext(), Middleware())
+        self.assertNotIn("private-family", result)
+        self.assertNotIn("Last route", result)
+        self.assertNotIn("Last filter state", result)
 
     def test_status_does_not_expose_unknown_settings_or_secrets(self):
         ctx = FakeContext({
@@ -102,14 +118,20 @@ class CommandTests(unittest.TestCase):
         result = handle_jev_command(FakeContext(), "stats", telemetry=telemetry)
         self.assertEqual(telemetry.since_hours, 24)
         self.assertIn("Jev decisions: 5", result)
+        self.assertIn("Jev latency p50/p95: 400ms / 700ms", result)
         self.assertIn("Avg Jev latency: 412ms", result)
-        self.assertIn("Jev cost: $0.000061", result)
+        self.assertIn("Jev cost avg/total: $0.00001220 / $0.000061", result)
         self.assertIn("Routes: web:3, terminal:2", result)
 
     def test_setting_failure_is_explicit(self):
         ctx = FakeContext(set_config=False)
         result = handle_jev_command(ctx, "off")
         self.assertIn("could not be changed", result)
+
+    def test_doctor_command_is_safe(self):
+        result = handle_jev_command(FakeContext(), "doctor")
+        self.assertIn("Hermes Jev Performance doctor", result)
+        self.assertIn("Network calls: 0", result)
 
     def test_help(self):
         self.assertEqual(handle_jev_command(FakeContext(), "help"), USAGE)

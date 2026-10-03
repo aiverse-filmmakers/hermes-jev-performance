@@ -46,6 +46,7 @@ class BenchmarkStoreTests(unittest.TestCase):
                 "kind": "controlled_matched_benchmark",
                 "warmups_excluded_from_deltas": True,
                 "order_policy": "paired_alternating",
+                "private_note": "MUST_NOT_EXPORT_METHODOLOGY",
             },
             now=now,
         )
@@ -92,6 +93,13 @@ class BenchmarkStoreTests(unittest.TestCase):
         store.add_usage(
             turn_key,
             {"input_tokens": input_tokens, "output_tokens": output_tokens},
+        )
+        store.record_runtime_identity(
+            turn_key,
+            provider="synthetic-provider",
+            requested_model="synthetic-model",
+            response_model="synthetic-model-v1",
+            api_mode="synthetic-api",
         )
         if mode == "on":
             store.record_decision(
@@ -185,6 +193,10 @@ class BenchmarkStoreTests(unittest.TestCase):
         self.assertAlmostEqual(row["hermes_duration_ms"], 800, places=2)
         self.assertEqual(row["tool_calls"], 2)
         self.assertEqual(row["llm_requests"], 1)
+        self.assertEqual(row["hermes_provider"], "synthetic-provider")
+        self.assertEqual(row["hermes_requested_model"], "synthetic-model")
+        self.assertEqual(row["hermes_response_model"], "synthetic-model-v1")
+        self.assertEqual(row["hermes_api_mode"], "synthetic-api")
         self.assertEqual(row["route_family"], "files")
         self.assertTrue(row["route_applied"])
         self.assertEqual(row["jev_latency_ms"], 200)
@@ -222,7 +234,7 @@ class BenchmarkStoreTests(unittest.TestCase):
             -250,
         )
 
-    def test_anonymized_export_strips_ids_paths_and_undeclared_environment(self):
+    def test_anonymized_export_strips_ids_paths_runtime_identity_and_unknown_metadata(self):
         store, path = self.make_store()
         now = self.seed_run(store)
         self.add_sample(
@@ -244,12 +256,18 @@ class BenchmarkStoreTests(unittest.TestCase):
         serialized = repr(payload)
         self.assertNotIn("private-sample-id", serialized)
         self.assertNotIn("MUST_NOT_EXPORT", serialized)
+        self.assertNotIn("MUST_NOT_EXPORT_METHODOLOGY", serialized)
         self.assertNotIn(str(path), serialized)
         self.assertNotIn("turn_key", serialized)
+        self.assertNotIn("synthetic-provider", serialized)
+        self.assertNotIn("synthetic-model", serialized)
+        self.assertNotIn("synthetic-model-v1", serialized)
+        self.assertNotIn("synthetic-api", serialized)
         self.assertFalse(payload["privacy"]["prompt_text_included"])
         self.assertFalse(payload["privacy"]["host_identifiers_included"])
+        self.assertFalse(payload["privacy"]["primary_runtime_identity_included"])
 
-    def test_schema_v3_has_benchmark_tables_without_content_columns(self):
+    def test_schema_v4_has_benchmark_tables_without_content_columns(self):
         store, path = self.make_store()
         store.initialize()
         forbidden = {

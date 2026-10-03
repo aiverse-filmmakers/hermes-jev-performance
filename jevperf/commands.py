@@ -6,10 +6,11 @@ from typing import Any
 
 from .compatibility import detect_compatibility
 from .config import VALID_MODES, read_config
+from .doctor import render_doctor, run_doctor
 
 
 USAGE = (
-    "Usage: /jev [status|on|off|shadow|stats|notice on|notice off|help]"
+    "Usage: /jev [status|on|off|shadow|stats|doctor|notice on|notice off|help]"
 )
 
 
@@ -23,23 +24,11 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
     config = read_config(ctx)
     compat = detect_compatibility(ctx)
 
-    compatibility = "supported" if compat["phase1_supported"] else "degraded"
+    compatibility = str(compat["level"])
     routing_surface = "available" if compat["routing_surface_ready"] else "unavailable"
     persistent_settings = "available" if compat["persistent_settings_ready"] else "unavailable"
     warnings = ", ".join(config.warnings) if config.warnings else "none"
 
-    last = getattr(router_middleware, "last_decision", None)
-    if last is None:
-        last_route = "none yet"
-    else:
-        confidence = (
-            f"{last.confidence:.2f}"
-            if isinstance(last.confidence, (int, float))
-            else "n/a"
-        )
-        last_route = f"{last.family or 'fallback'} ({confidence}, {last.reason})"
-
-    filter_reason = getattr(router_middleware, "last_filter_reason", None) or "none yet"
 
     return "\n".join(
         [
@@ -55,10 +44,8 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
             f"Hermes compatibility: {compatibility}",
             f"Routing middleware surface: {routing_surface}",
             f"Persistent settings surface: {persistent_settings}",
-            f"Last route: {last_route}",
-            f"Last filter state: {filter_reason}",
             f"Config warnings: {warnings}",
-            "Phase: 6 (controls + telemetry)",
+            "Phase: 9 (hardening + packaging)",
         ]
     )
 
@@ -75,9 +62,14 @@ def render_stats(telemetry: Any) -> str:
         return "Jev stats (last 24h)\nNo telemetry recorded yet."
 
     routes = ", ".join(f"{name}:{count}" for name, count in stats.routes) or "none"
-    cost = (
+    total_cost = (
         f"${stats.total_jev_cost_usd:.6f}"
         if isinstance(stats.total_jev_cost_usd, (int, float))
+        else "n/a"
+    )
+    avg_cost = (
+        f"${stats.avg_jev_cost_usd:.8f}"
+        if isinstance(stats.avg_jev_cost_usd, (int, float))
         else "n/a"
     )
     input_tokens = str(stats.input_tokens) if stats.input_tokens is not None else "n/a"
@@ -91,8 +83,9 @@ def render_stats(telemetry: Any) -> str:
             f"Routes applied: {stats.applied}",
             f"Fallback/unrestricted: {stats.fallback}",
             f"Avg confidence: {_fmt_float(stats.avg_confidence, digits=2)}",
+            f"Jev latency p50/p95: {_fmt_float(stats.p50_jev_latency_ms, 'ms', 0)} / {_fmt_float(stats.p95_jev_latency_ms, 'ms', 0)}",
             f"Avg Jev latency: {_fmt_float(stats.avg_jev_latency_ms, 'ms', 0)}",
-            f"Jev cost: {cost}",
+            f"Jev cost avg/total: {avg_cost} / {total_cost}",
             f"Avg Hermes turn: {_fmt_float(stats.avg_turn_duration_ms, 'ms', 0)}",
             f"Avg tool calls: {_fmt_float(stats.avg_tool_calls, digits=2)}",
             f"Avg LLM requests: {_fmt_float(stats.avg_llm_requests, digits=2)}",
@@ -152,6 +145,11 @@ def handle_jev_command(
         return set_mode(ctx, text, telemetry, source="slash")
     if text == "stats":
         return render_stats(telemetry)
+    if text == "doctor":
+        try:
+            return render_doctor(run_doctor(ctx))
+        except Exception:
+            return "Jev doctor unavailable: local diagnostics could not complete."
     if text == "notice on":
         return set_notice(ctx, True)
     if text == "notice off":

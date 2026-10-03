@@ -29,6 +29,22 @@ class DashboardAssetTests(unittest.TestCase):
         self.assertNotIn("window.__HERMES_SESSION_TOKEN__", source)
         self.assertNotIn("localStorage", source)
 
+    def test_bundle_explicitly_propagates_management_profile(self):
+        source = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
+        self.assertIn('new URLSearchParams(window.location.search).get("profile")', source)
+        self.assertIn('SDK.fetchJSON(apiUrl("/status"))', source)
+        self.assertIn('SDK.fetchJSON(apiUrl("/mode"), {', source)
+        self.assertIn('profile=" + encodeURIComponent(profile)', source)
+
+    def test_bundle_exposes_required_latency_and_cost_metrics(self):
+        source = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
+        self.assertIn("Jev latency p50 / p95", source)
+        self.assertIn("summary.p50_jev_latency_ms", source)
+        self.assertIn("summary.p95_jev_latency_ms", source)
+        self.assertIn("Jev cost avg / total", source)
+        self.assertIn("summary.avg_jev_cost_usd", source)
+        self.assertIn("summary.total_jev_cost_usd", source)
+
     def test_backend_declares_bounded_status_summary_and_mode_routes(self):
         source = (ROOT / "dashboard" / "plugin_api.py").read_text(encoding="utf-8")
         self.assertIn('@router.get("/status")', source)

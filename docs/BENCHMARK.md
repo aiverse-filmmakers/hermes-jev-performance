@@ -7,7 +7,7 @@ Phase 8 adds a reproducible, explicit OFF-vs-ON benchmark. It is deliberately se
 The benchmark compares the same read-only workload under:
 
 - **OFF**: no Jev call and no tool filtering.
-- **ON**: Jev may apply a confident tool-family route.
+- **ON**: Jev must produce the expected fixture route behavior for the sample to count as benchmark evidence.
 
 It measures:
 
@@ -23,7 +23,7 @@ It measures:
 
 It does not score answer quality automatically.
 
-## Safety
+## Safety and preflight
 
 The live benchmark is never run implicitly.
 
@@ -39,7 +39,18 @@ Explicit execution:
 hermes jev benchmark --live
 ```
 
-The default local suite is read-only and excludes network access. The optional public-web fixture requires:
+Before any live benchmark turn is spent, the runner requires:
+
+- a Hermes executable;
+- `telemetry_enabled=true` so the paired turns can actually be measured;
+- the v1 Jev provider to be OpenRouter;
+- a usable dedicated or generic OpenRouter Jev credential;
+- a finite timeout between 10 and 3600 seconds;
+- a valid read-only fixture suite and benchmark plan.
+
+If a preflight condition fails, no benchmark turn is launched.
+
+The default workload fixtures are read-only and exclude the public-web fixture. A live benchmark still uses the normal Hermes model/provider, and ON samples also call OpenRouter Jev. The optional public-web workload fixture requires:
 
 ```bash
 hermes jev benchmark --live --include-network
@@ -52,12 +63,12 @@ The runner never changes the user's persistent Jev mode. Each spawned benchmark 
 Defaults:
 
 ```text
-fixtures: 4 offline/read-only
+fixtures: 4 local/read-only workload fixtures
 warmups: 1 per fixture per mode
 measured repeats: 3
 modes: OFF and ON
 order: paired alternating
-network: excluded
+public-web workload fixture: excluded
 ```
 
 That produces:
@@ -81,13 +92,13 @@ Default read-only fixtures cover:
 - `files`: read the repository README heading without modification;
 - `skills`: inspect skill availability without modification.
 
-Optional network fixture:
+Optional public-web workload fixture:
 
 - `web`: public read-only lookup of the official Hermes Agent repository.
 
 The default suite does not send email, modify GitHub, write production files, edit skills, alter memory, purchase anything, or invoke connected app mutations.
 
-## Deltas
+## Which samples count
 
 Only successful matched OFF/ON samples with the same:
 
@@ -96,6 +107,12 @@ fixture_id + repeat_index
 ```
 
 are used for metric deltas.
+
+A complete OFF turn is eligible.
+
+A complete ON turn is eligible only if the recorded Jev route matches the fixture's expected family. For a normal single-family fixture, the route must also have been applied. For intentionally unrestricted `none` or `multi` fixtures, the matching family must be recorded without a hard filter.
+
+A complete ON turn that failed open, selected the wrong family, or did not apply an expected single-family route is counted as an **invalid routing sample** and excluded from matched deltas. This prevents a benchmark from claiming an ON effect when Jev did not actually perform the expected routing.
 
 For each metric:
 
@@ -123,11 +140,13 @@ Each run records only low-cardinality reproducibility metadata:
 - repeat/warm-up counts;
 - order policy.
 
-It does not record hostname, username, home directory, current working directory, IP address, MAC address, API keys, prompts, tool payloads, raw Hermes turn IDs, or conversation content.
+The local SQLite benchmark sample may also retain content-free primary Hermes provider/model/API-mode identity captured from the successful main-loop hook. That local identity is useful for private reproducibility checks but is deliberately excluded from the default dashboard payload and anonymized export because custom model identifiers can contain private deployment names or filesystem paths.
+
+The benchmark does not record hostname, username, home directory, current working directory, IP address, MAC address, API keys, prompts, tool payloads, raw Hermes turn IDs, or conversation content.
 
 ## Storage separation
 
-Schema v3 adds dedicated:
+Schema v3 introduced the dedicated benchmark tables; schema v4 adds content-free Hermes runtime identity fields captured locally per sample:
 
 - `benchmark_runs`;
 - `benchmark_samples`.
@@ -140,7 +159,15 @@ All ordinary dashboard queries explicitly exclude benchmark-tagged Hermes turns 
 
 CI never calls Hermes providers or OpenRouter.
 
-`benchmarks/fixtures/ci_synthetic.json` contains deterministic mocked OFF and ON metrics. Unit tests run the same pairing/delta engine against these fixtures and assert zero external calls.
+`benchmarks/fixtures/ci_synthetic.json` contains deterministic mocked OFF and ON metrics. Unit tests run the same planning, route-validity, pairing and delta engine against these fixtures and assert zero external calls.
+
+## Dashboard
+
+The dashboard keeps controlled benchmark runs separate from observational OFF/SHADOW/ON usage.
+
+It exposes only reviewed low-cardinality environment and methodology fields. It does not return raw benchmark sample IDs, raw turn IDs, arbitrary local provider/model/API identifiers, prompts, tool payloads, or filesystem paths.
+
+A benchmark's `failed_samples` count includes both incomplete/process-failed samples and complete samples that do not satisfy the expected routing behavior.
 
 ## Export
 
@@ -154,8 +181,8 @@ hermes jev benchmark --live --export ./benchmark.json
 
 The JSON export includes:
 
-- safe run metadata;
-- methodology;
+- explicitly whitelisted safe run metadata;
+- explicitly whitelisted methodology fields;
 - paired comparison results;
 - content-free sample metrics.
 
@@ -166,8 +193,9 @@ It excludes:
 - prompts;
 - tool arguments/results;
 - filesystem paths;
-- undeclared environment fields;
-- host identifiers.
+- undeclared environment or methodology fields;
+- host identifiers;
+- arbitrary primary Hermes provider/model/API-mode strings.
 
 ## Useful options
 
@@ -183,6 +211,6 @@ A preview without `--live` always performs zero benchmark turns.
 
 ## Interpretation
 
-A controlled matched benchmark supports a stronger comparison than ordinary usage because the workloads are matched and warm-up/order rules are defined.
+A controlled matched benchmark supports a stronger comparison than ordinary usage because the workloads are matched, expected routing behavior is verified, and warm-up/order rules are defined.
 
-It still does not prove semantic equivalence or answer quality. Published claims must include sample count, fixture set, versions, failures, and methodology alongside any duration/token/tool delta.
+It still does not prove semantic equivalence or answer quality. Published claims must include sample count, fixture set, versions, failures, invalid-routing count, and methodology alongside any duration/token/tool delta.

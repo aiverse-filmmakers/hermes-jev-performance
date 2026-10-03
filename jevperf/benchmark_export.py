@@ -26,6 +26,23 @@ _ENVIRONMENT_KEYS = {
     "python_implementation",
 }
 
+_METHODOLOGY_KEYS = {
+    "kind",
+    "modes",
+    "warmups_excluded_from_deltas",
+    "order_policy",
+    "fixture_order",
+    "read_only_default",
+    "public_web_fixture_included",
+    "timeout_seconds",
+    "sample_count",
+    "measured_sample_count",
+    "on_samples_require_expected_route",
+}
+
+# Deliberately exclude local Hermes provider/model/API identity from the public
+# anonymized export. Those fields stay in the local DB for reproducibility, but
+# custom model IDs can contain organization-specific names or filesystem paths.
 _SAMPLE_KEYS = {
     "fixture_id",
     "family",
@@ -69,7 +86,10 @@ def build_anonymized_export(store: MetricsStore, run_id: str) -> dict[str, Any]:
         _ENVIRONMENT_KEYS,
     )
     methodology = run.get("methodology")
-    safe_methodology = dict(methodology) if isinstance(methodology, dict) else {}
+    safe_methodology = _pick(
+        methodology if isinstance(methodology, dict) else {},
+        _METHODOLOGY_KEYS,
+    )
 
     return {
         "format": "hermes-jev-performance-benchmark-v1",
@@ -95,6 +115,7 @@ def build_anonymized_export(store: MetricsStore, run_id: str) -> dict[str, Any]:
             "raw_turn_ids_included": False,
             "filesystem_paths_included": False,
             "host_identifiers_included": False,
+            "primary_runtime_identity_included": False,
         },
     }
 

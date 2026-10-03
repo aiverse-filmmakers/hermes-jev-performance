@@ -40,3 +40,18 @@ Substantial code copied or adapted from an upstream project must retain that pro
 
 - Website: https://openrouter.ai/
 - The v1 provider path uses OpenRouter's Jev Decisions API. OpenRouter account terms and model availability remain external dependencies.
+
+
+## Phase 9 attribution audit
+
+Phase 9 re-audited the implementation against `docs/UPSTREAMS.md`.
+
+Current source-level adaptation explicitly identified in the repository:
+
+- `jevperf/client.py` identifies both MIT upstream reference repositories and exact planning commits in its module header.
+- The corresponding upstream copyright notices are preserved in this distribution notice.
+- Dashboard, benchmark, telemetry, compatibility, packaging and doctor code in this repository is project-authored from documented concepts/public Hermes APIs rather than copied source blocks from the reference projects.
+- Hermes Agent is consumed as an external host/API contract; its source is not redistributed by this repository.
+- TypeSafe Jev and OpenRouter are external services/products; no model/provider source is redistributed.
+
+Any future substantial source adaptation requires both a source-file provenance note and an update to this notice/UPSTREAMS documentation before release.

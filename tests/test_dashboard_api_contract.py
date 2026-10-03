@@ -4,6 +4,7 @@ import pathlib
 import sys
 import types
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -66,6 +67,18 @@ def load_api_module():
     return module
 
 
+def fake_hermes_profile_modules(*, exists=True, matches=True):
+    profiles = types.ModuleType("hermes_cli.profiles")
+    profiles.profile_exists = lambda name: exists
+    profiles.profile_matches_home = lambda name: matches
+    hermes_cli = types.ModuleType("hermes_cli")
+    hermes_cli.profiles = profiles
+    return {
+        "hermes_cli": hermes_cli,
+        "hermes_cli.profiles": profiles,
+    }
+
+
 class DashboardApiContractTests(unittest.TestCase):
     def test_expected_routes_only(self):
         module = load_api_module()
@@ -81,6 +94,40 @@ class DashboardApiContractTests(unittest.TestCase):
                 ("PUT", "/mode"),
             },
         )
+
+    def test_every_backend_route_enforces_selected_profile_scope(self):
+        source = PLUGIN_API.read_text(encoding="utf-8")
+        self.assertEqual(source.count("_ensure_profile_scope(profile)"), 6)
+
+    def test_named_profile_is_allowed_when_host_scope_matches(self):
+        module = load_api_module()
+        with mock.patch.dict(
+            sys.modules,
+            fake_hermes_profile_modules(exists=True, matches=True),
+        ):
+            module._ensure_profile_scope("work")
+
+    def test_named_profile_mismatch_fails_closed(self):
+        module = load_api_module()
+        with mock.patch.dict(
+            sys.modules,
+            fake_hermes_profile_modules(exists=True, matches=False),
+        ):
+            with self.assertRaises(FakeHTTPException) as caught:
+                module._ensure_profile_scope("work")
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertNotIn("/", caught.exception.detail)
+
+    def test_unknown_named_profile_is_safe_404(self):
+        module = load_api_module()
+        with mock.patch.dict(
+            sys.modules,
+            fake_hermes_profile_modules(exists=False, matches=False),
+        ):
+            with self.assertRaises(FakeHTTPException) as caught:
+                module._ensure_profile_scope("missing")
+        self.assertEqual(caught.exception.status_code, 404)
+        self.assertNotIn("missing", caught.exception.detail)
 
     def test_mode_body_rejects_extra_fields(self):
         module = load_api_module()
@@ -130,9 +177,11 @@ class DashboardApiContractTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 503)
         self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
 
-    def test_bundle_uses_host_authenticated_transport_for_mode_write(self):
+    def test_bundle_uses_host_authenticated_profile_scoped_transport_for_mode_write(self):
         source = (ROOT / "dashboard" / "dist" / "index.js").read_text(encoding="utf-8")
-        self.assertIn('SDK.fetchJSON(API + "/mode"', source)
+        self.assertIn('new URLSearchParams(window.location.search).get("profile")', source)
+        self.assertIn('SDK.fetchJSON(apiUrl("/mode"), {', source)
+        self.assertIn('profile=" + encodeURIComponent(profile)', source)
         self.assertIn('method: "PUT"', source)
         self.assertNotIn("window.__HERMES_SESSION_TOKEN__", source)
         self.assertNotIn("document.cookie", source)
@@ -160,6 +209,7 @@ class DashboardApiContractTests(unittest.TestCase):
             asyncio.run(module.get_benchmarks(limit=10))
         self.assertEqual(caught.exception.status_code, 503)
         self.assertNotIn("PRIVATE_INTERNAL_DETAIL", caught.exception.detail)
+
 
 if __name__ == "__main__":
     unittest.main()

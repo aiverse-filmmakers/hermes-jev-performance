@@ -84,11 +84,11 @@ Ship dashboard assets inside the same Hermes plugin directory using Hermes' supp
 
 ## ADR-011 - First install defaults to Shadow
 
-**Status:** Proposed
+**Status:** Accepted
 
-Recommended first-run mode is `shadow`, not `on`.
+First-run mode is `shadow`, not `on`.
 
-**Why:** lets users observe decisions before enabling behavioral changes. Final default should be confirmed in Phase 1.
+**Why:** lets users observe decisions before enabling behavioral changes. Phase 1 confirmed this default in the validated configuration contract.
 
 ## ADR-012 - Controlled benchmark separated from organic analytics
 
@@ -105,3 +105,12 @@ Controlled A/B runs are stored/tagged separately from ordinary usage. Schema v3 
 The live benchmark passes OFF/ON through validated benchmark-only environment context to each spawned Hermes process. It does not change the user's persistent plugin mode.
 
 **Why:** a benchmark may run while Telegram or another Hermes session is active. Temporarily changing the global mode would contaminate unrelated turns and could change normal user behavior during the experiment.
+
+
+## ADR-014 - Preserve Hermes deferred-tool bridge during family filtering
+
+**Status:** Accepted
+
+ON-mode family filtering removes known competing eager tool schemas, but always preserves Hermes' `tool_search` / `tool_describe` / `tool_call` bridge (including provider aliases such as `hermes_tool_search`).
+
+**Why:** current public `llm_request` middleware can replace the model-facing request tool array, but it cannot safely re-scope the underlying deferred-tool catalog after Tool Search assembly. Removing the bridge can make a correctly routed request lose access to a deferred tool that belongs to the chosen family, such as an installed GitHub plugin or a deferred media tool. Jev routing is a performance optimization, not an authorization boundary, so capability preservation takes priority over hard isolation of deferred tools.

@@ -1,7 +1,8 @@
 name: hermes-jev-performance
-version: 0.1.0-alpha.6
+version: 0.1.0-alpha.7
 manifest_version: 2
 api_version: 1
+requires_hermes: ">=0.21.5"
 description: Hermes-native Jev tool routing and performance observability.
 license: MIT
 homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance

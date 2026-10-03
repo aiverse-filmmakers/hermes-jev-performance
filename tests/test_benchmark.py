@@ -1,4 +1,3 @@
-import json
 import pathlib
 import unittest
 
@@ -61,12 +60,12 @@ class BenchmarkTests(unittest.TestCase):
 
     def test_comparison_excludes_warmups_and_pairs_by_fixture_repeat(self):
         samples = [
-            {"fixture_id": "a", "repeat_index": 0, "mode": "off", "is_warmup": True, "status": "complete", "hermes_duration_ms": 9999},
-            {"fixture_id": "a", "repeat_index": 0, "mode": "on", "is_warmup": True, "status": "complete", "hermes_duration_ms": 1},
-            {"fixture_id": "a", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "hermes_duration_ms": 1000, "tool_calls": 4, "llm_requests": 2, "input_tokens": 1000, "output_tokens": 100},
-            {"fixture_id": "a", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "complete", "hermes_duration_ms": 800, "tool_calls": 2, "llm_requests": 1, "input_tokens": 800, "output_tokens": 90},
-            {"fixture_id": "a", "repeat_index": 1, "mode": "off", "is_warmup": False, "status": "complete", "hermes_duration_ms": 1200, "tool_calls": 4, "llm_requests": 2, "input_tokens": 1100, "output_tokens": 100},
-            {"fixture_id": "a", "repeat_index": 1, "mode": "on", "is_warmup": False, "status": "complete", "hermes_duration_ms": 900, "tool_calls": 2, "llm_requests": 1, "input_tokens": 850, "output_tokens": 90},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "off", "is_warmup": True, "status": "complete", "hermes_duration_ms": 9999},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "on", "is_warmup": True, "status": "complete", "route_family": "files", "route_applied": True, "hermes_duration_ms": 1},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "hermes_duration_ms": 1000, "tool_calls": 4, "llm_requests": 2, "input_tokens": 1000, "output_tokens": 100},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "complete", "route_family": "files", "route_applied": True, "hermes_duration_ms": 800, "tool_calls": 2, "llm_requests": 1, "input_tokens": 800, "output_tokens": 90},
+            {"fixture_id": "a", "family": "files", "repeat_index": 1, "mode": "off", "is_warmup": False, "status": "complete", "hermes_duration_ms": 1200, "tool_calls": 4, "llm_requests": 2, "input_tokens": 1100, "output_tokens": 100},
+            {"fixture_id": "a", "family": "files", "repeat_index": 1, "mode": "on", "is_warmup": False, "status": "complete", "route_family": "files", "route_applied": True, "hermes_duration_ms": 900, "tool_calls": 2, "llm_requests": 1, "input_tokens": 850, "output_tokens": 90},
         ]
         result = calculate_comparison(samples)
         duration = result["metrics"]["hermes_duration_ms"]
@@ -76,17 +75,36 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(duration["on_mean"], 850)
         self.assertEqual(duration["absolute_delta"], -250)
         self.assertAlmostEqual(duration["percent_change"], -22.7272727)
+        self.assertEqual(result["invalid_routing_samples"]["on"], 0)
 
     def test_failed_half_pair_is_not_used_for_metric_deltas(self):
         samples = [
-            {"fixture_id": "a", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "tool_calls": 3},
-            {"fixture_id": "a", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "process_error", "tool_calls": 1},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "tool_calls": 3},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "process_error", "tool_calls": 1},
         ]
         result = calculate_comparison(samples)
         self.assertEqual(result["matched_pairs"], 0)
         self.assertEqual(result["metrics"]["tool_calls"]["pairs"], 0)
         self.assertEqual(result["success_rate"]["off"], 1.0)
         self.assertEqual(result["success_rate"]["on"], 0.0)
+
+    def test_on_fail_open_or_wrong_route_is_not_benchmark_evidence(self):
+        samples = [
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "tool_calls": 3},
+            {"fixture_id": "a", "family": "files", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "complete", "route_family": "web", "route_applied": False, "tool_calls": 1},
+        ]
+        result = calculate_comparison(samples)
+        self.assertEqual(result["matched_pairs"], 0)
+        self.assertEqual(result["successful_samples"]["on"], 0)
+        self.assertEqual(result["invalid_routing_samples"]["on"], 1)
+
+    def test_none_route_is_valid_without_hard_filter(self):
+        samples = [
+            {"fixture_id": "n", "family": "none", "repeat_index": 0, "mode": "off", "is_warmup": False, "status": "complete", "hermes_duration_ms": 100},
+            {"fixture_id": "n", "family": "none", "repeat_index": 0, "mode": "on", "is_warmup": False, "status": "complete", "route_family": "none", "route_applied": False, "hermes_duration_ms": 110},
+        ]
+        result = calculate_comparison(samples)
+        self.assertEqual(result["matched_pairs"], 1)
 
     def test_environment_metadata_has_no_host_user_or_path_fields(self):
         env = capture_environment(
@@ -112,6 +130,7 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(result["comparison"]["matched_pairs"], 9)
         duration = result["comparison"]["metrics"]["hermes_duration_ms"]
         self.assertLess(duration["percent_change"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

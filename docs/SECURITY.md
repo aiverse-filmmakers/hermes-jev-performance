@@ -61,8 +61,11 @@ Backend routes:
 - validate mode/settings writes;
 - use POST/PUT for mutation;
 - rely on Hermes' authenticated dashboard context;
+- preserve the selected Hermes management profile explicitly on plugin API requests;
 - never provide a credential-read endpoint;
 - avoid destructive metrics-clear actions without explicit confirmation semantics.
+
+Arbitrary local primary model/provider/API identifiers are kept out of benchmark dashboard payloads because custom identifiers can contain private deployment names or filesystem paths.
 
 ## 6. Fail-open vs fail-closed
 
@@ -75,6 +78,8 @@ This distinction must be preserved.
 ## 7. External actions
 
 Jev selects a tool family only. It does not authorize external actions. All normal Hermes tool permissions/approval mechanisms remain authoritative.
+
+The Hermes deferred-tool bridge remains available during Jev family filtering because the current public middleware API cannot safely re-scope its underlying catalog after assembly. Jev filtering therefore narrows known eager schemas but is never an authorization boundary.
 
 ## 8. Supply-chain/provenance
 
@@ -101,3 +106,36 @@ Debug content logging, if ever introduced, must be explicit opt-in, local, time-
 ## 10. Public repository policy
 
 This repository must remain safe to make public at all times. Synthetic fixtures only. See `SOURCE_OF_TRUTH.md` public-repository hygiene.
+
+## 11. Telemetry corruption and recovery
+
+Telemetry is not allowed to become an agent availability dependency.
+
+If the SQLite metrics store is unreadable or corrupt:
+
+- routing/agent execution continues through existing fail-open boundaries;
+- dashboard telemetry may report degraded/unavailable;
+- the plugin does not silently delete or replace the database;
+- `hermes jev doctor` reports the local failure without exposing paths in dashboard payloads;
+- explicit `hermes jev doctor --repair-db` may quarantine the corrupt database and create a clean schema.
+
+Repair is limited to this plugin's local metrics files. It does not modify Hermes conversations, provider credentials, config, or other plugins.
+
+**Concurrency precondition:** database repair must be run only when no other Hermes gateway, dashboard, agent, or automation process is actively using the same profile's telemetry database. SQLite recovery renames the database and any WAL/SHM companions; racing a concurrent writer would be unsafe. Stop the other Hermes processes for that profile, run the repair from a one-off CLI process, verify `hermes jev doctor`, then restart normal services. The repair command is intentionally explicit and is never invoked automatically by routing or dashboard code.
+
+## 12. Public repository CI scan
+
+CI runs `scripts/public_repo_scan.py` on every supported Python matrix job.
+
+The scan blocks known high-risk public-repository patterns including:
+
+- private-key material;
+- provider/repository/chat token shapes covered by the scanner;
+- non-placeholder credential assignments;
+- absolute Linux/macOS/Windows user-home paths;
+- non-example email addresses;
+- non-documentation IPv4 addresses.
+
+The scanner prints only the file and rule identifier, never the matched value.
+
+This scanner supplements, rather than replaces, manual release review and GitHub's own repository security controls.

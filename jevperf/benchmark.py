@@ -7,7 +7,6 @@ import hashlib
 import json
 import platform
 import statistics
-import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 import uuid
@@ -233,11 +232,37 @@ def _delta(off_value: float | None, on_value: float | None) -> dict[str, float |
     }
 
 
+def _sample_is_valid(sample: Mapping[str, Any]) -> bool:
+    """Return whether a measured sample represents the intended benchmark mode.
+
+    OFF samples only need a complete Hermes turn. ON samples must also prove that
+    Jev produced the expected family outcome. For unrestricted `none`/`multi`
+    fixtures, a matching family with no hard filter is expected. Other families
+    must match and actually apply filtering. This prevents a fail-open/wrong-route
+    ON turn from being treated as evidence about Jev's routing effect.
+    """
+    if str(sample.get("status") or "") != "complete":
+        return False
+    mode = str(sample.get("mode") or "")
+    if mode == "off":
+        return True
+    if mode != "on":
+        return False
+
+    expected = str(sample.get("family") or "")
+    actual = str(sample.get("route_family") or "")
+    applied = sample.get("route_applied") is True
+    if expected in {"none", "multi"}:
+        return actual == expected and not applied
+    return actual == expected and applied
+
+
 def calculate_comparison(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    """Calculate paired OFF-vs-ON deltas from successful measured samples only."""
+    """Calculate paired OFF-vs-ON deltas from valid measured samples only."""
     grouped: dict[tuple[str, int], dict[str, Mapping[str, Any]]] = {}
     success_counts = {"off": 0, "on": 0}
     measured_counts = {"off": 0, "on": 0}
+    invalid_routing_counts = {"off": 0, "on": 0}
 
     for sample in samples:
         if bool(sample.get("is_warmup")):
@@ -246,7 +271,9 @@ def calculate_comparison(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]
         if mode not in {"off", "on"}:
             continue
         measured_counts[mode] += 1
-        if str(sample.get("status") or "") != "complete":
+        if not _sample_is_valid(sample):
+            if str(sample.get("status") or "") == "complete":
+                invalid_routing_counts[mode] += 1
             continue
         success_counts[mode] += 1
         fixture_id = str(sample.get("fixture_id") or "")
@@ -296,6 +323,7 @@ def calculate_comparison(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]
         "matched_pairs": len(pairs),
         "measured_samples": measured_counts,
         "successful_samples": success_counts,
+        "invalid_routing_samples": invalid_routing_counts,
         "success_rate": {
             mode: (
                 success_counts[mode] / measured_counts[mode]
@@ -306,8 +334,9 @@ def calculate_comparison(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]
         "metrics": metrics,
         "interpretation": "controlled_matched_benchmark",
         "claim_policy": (
-            "Report absolute and percent deltas only. Do not call a result faster, "
-            "cheaper, or better without reviewing sample count, failures, and methodology."
+            "Report absolute and percent deltas only for valid matched pairs. "
+            "Do not call a result faster, cheaper, or better without reviewing "
+            "sample count, routing validity, failures, and methodology."
         ),
     }
 
@@ -351,6 +380,10 @@ def run_synthetic_benchmark(
             raise ValueError(
                 f"synthetic fixture {sample.fixture_id!r} missing {sample.mode} metrics"
             )
+        synthetic_route_family = sample.family if sample.mode == "on" else None
+        synthetic_route_applied = (
+            sample.mode == "on" and sample.family not in {"none", "multi"}
+        )
         samples.append(
             {
                 "fixture_id": sample.fixture_id,
@@ -360,6 +393,8 @@ def run_synthetic_benchmark(
                 "order_index": sample.order_index,
                 "is_warmup": sample.is_warmup,
                 "status": "complete",
+                "route_family": synthetic_route_family,
+                "route_applied": synthetic_route_applied,
                 **dict(metrics),
             }
         )

@@ -28,6 +28,8 @@ class TelemetryObserver:
         self.stores = stores or StoreProvider()
         self._seen_turns: OrderedDict[tuple[str, str], None] = OrderedDict()
         self._seen_lock = threading.Lock()
+        self._latest_turn_by_session: OrderedDict[str, str] = OrderedDict()
+        self._session_lock = threading.Lock()
         self._last_cleanup: dict[str, float] = {}
         self._cleanup_lock = threading.Lock()
 
@@ -42,6 +44,28 @@ class TelemetryObserver:
             while len(self._seen_turns) > 2048:
                 self._seen_turns.popitem(last=False)
         _safe_call(store.touch_turn, key, mode, benchmark=benchmark)
+
+    def _remember_turn_for_session(self, session_id: Any, key: str) -> None:
+        session = str(session_id or "").strip()
+        if not session:
+            return
+        with self._session_lock:
+            self._latest_turn_by_session[session] = key
+            self._latest_turn_by_session.move_to_end(session)
+            while len(self._latest_turn_by_session) > 2048:
+                self._latest_turn_by_session.popitem(last=False)
+
+    def _latest_turn_for_session(self, session_id: Any, *, remove: bool = False) -> str | None:
+        session = str(session_id or "").strip()
+        if not session:
+            return None
+        with self._session_lock:
+            if remove:
+                return self._latest_turn_by_session.pop(session, None)
+            key = self._latest_turn_by_session.get(session)
+            if key is not None:
+                self._latest_turn_by_session.move_to_end(session)
+            return key
 
     def _cleanup_if_due(self, store: Any, retention_days: int) -> None:
         identity = str(getattr(store, "path", ""))
@@ -62,6 +86,7 @@ class TelemetryObserver:
             return key
         store = self.stores.get()
         benchmark = read_benchmark_context()
+        self._remember_turn_for_session(session_id, key)
         self._touch_once(store, key, mode or config.mode, benchmark)
         self._cleanup_if_due(store, config.retention_days)
         return key
@@ -113,9 +138,18 @@ class TelemetryObserver:
         key = turn_key(kwargs.get("session_id"), kwargs.get("turn_id"))
         if key is None or not read_config(self.ctx).telemetry_enabled:
             return
+        store = self.stores.get()
+        _safe_call(
+            store.record_runtime_identity,
+            key,
+            provider=kwargs.get("provider"),
+            requested_model=kwargs.get("model"),
+            response_model=kwargs.get("response_model"),
+            api_mode=kwargs.get("api_mode"),
+        )
         usage = kwargs.get("usage")
         _safe_call(
-            self.stores.get().add_usage,
+            store.add_usage,
             key,
             usage if isinstance(usage, dict) else None,
         )
@@ -127,7 +161,15 @@ class TelemetryObserver:
         _safe_call(self.stores.get().increment_tool_call, key)
 
     def on_session_end(self, **kwargs: Any) -> None:
-        key = turn_key(kwargs.get("session_id"), kwargs.get("turn_id"))
+        session_id = kwargs.get("session_id")
+        key = turn_key(session_id, kwargs.get("turn_id"))
+        if key is None:
+            # Current Hermes has reduced CLI/TUI shutdown shapes that may omit
+            # turn_id. Fall back to the latest in-memory opaque key for this
+            # session; raw session IDs are never persisted.
+            key = self._latest_turn_for_session(session_id, remove=True)
+        else:
+            self._latest_turn_for_session(session_id, remove=True)
         if key is None or not read_config(self.ctx).telemetry_enabled:
             return
 

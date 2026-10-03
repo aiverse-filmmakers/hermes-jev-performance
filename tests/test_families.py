@@ -43,7 +43,7 @@ class FamilyTests(unittest.TestCase):
         self.assertIn("custom_future_tool", names)
         self.assertNotIn("terminal", names)
         self.assertNotIn("read_file", names)
-        self.assertNotIn("tool_call", names)
+        self.assertIn("tool_call", names)
 
     def test_github_keeps_repo_primitives(self):
         tools = [
@@ -56,7 +56,23 @@ class FamilyTests(unittest.TestCase):
         filtered, applied, _ = filter_tools(tools, "github")
         names = [tool_name(tool) for tool in filtered]
         self.assertTrue(applied)
-        self.assertEqual(names, ["terminal", "read_file", "skill_view"])
+        self.assertEqual(names, ["terminal", "read_file", "skill_view", "tool_call"])
+
+    def test_deferred_bridge_is_preserved_for_non_app_routes(self):
+        tools = [
+            responses_tool("web_search"),
+            responses_tool("tool_search"),
+            responses_tool("tool_describe"),
+            responses_tool("tool_call"),
+            responses_tool("terminal"),
+        ]
+        filtered, applied, _ = filter_tools(tools, "web")
+        names = [tool_name(tool) for tool in filtered]
+        self.assertTrue(applied)
+        self.assertEqual(
+            names,
+            ["web_search", "tool_search", "tool_describe", "tool_call"],
+        )
 
     def test_apps_keeps_bridge_and_mcp_tools(self):
         tools = [

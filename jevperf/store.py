@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 PLUGIN_DATA_DIR = "hermes-jev-performance"
 DB_FILENAME = "metrics.sqlite3"
 
@@ -56,6 +56,25 @@ def _integer(value: Any) -> int | None:
     return max(0, value)
 
 
+def _percentile(values: list[float], fraction: float) -> float | None:
+    """Linear-interpolated percentile over finite sorted metadata values."""
+    clean = sorted(
+        float(value)
+        for value in values
+        if isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    )
+    if not clean:
+        return None
+    if len(clean) == 1:
+        return clean[0]
+    position = max(0.0, min(1.0, float(fraction))) * (len(clean) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(clean) - 1)
+    weight = position - lower
+    return clean[lower] + ((clean[upper] - clean[lower]) * weight)
+
+
 @dataclass(frozen=True)
 class StatsSummary:
     since_hours: int
@@ -65,6 +84,9 @@ class StatsSummary:
     fallback: int
     avg_confidence: float | None
     avg_jev_latency_ms: float | None
+    p50_jev_latency_ms: float | None
+    p95_jev_latency_ms: float | None
+    avg_jev_cost_usd: float | None
     total_jev_cost_usd: float | None
     avg_turn_duration_ms: float | None
     avg_tool_calls: float | None
@@ -72,6 +94,72 @@ class StatsSummary:
     input_tokens: int | None
     output_tokens: int | None
     routes: tuple[tuple[str, int], ...]
+
+
+def inspect_database(path: Path | str | None = None) -> dict[str, Any]:
+    """Read-only SQLite health probe. Never creates or migrates the database."""
+    target = Path(path) if path is not None else default_db_path()
+    if not target.exists():
+        return {"state": "missing", "schema_version": None, "quick_check": None}
+    try:
+        uri = target.resolve().as_uri() + "?mode=ro"
+        con = sqlite3.connect(uri, uri=True, timeout=2.0)
+        try:
+            row = con.execute("PRAGMA quick_check").fetchone()
+            quick = str(row[0]) if row else "unknown"
+            schema_row = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()
+            version = int(schema_row[0]) if schema_row else 0
+        finally:
+            con.close()
+        return {
+            "state": "ready" if quick.lower() == "ok" else "corrupt",
+            "schema_version": version,
+            "quick_check": quick,
+        }
+    except Exception:
+        return {"state": "corrupt", "schema_version": None, "quick_check": None}
+
+
+def repair_corrupt_database(
+    path: Path | str | None = None,
+    *,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Explicitly quarantine an unreadable metrics DB and create a clean schema."""
+    target = Path(path) if path is not None else default_db_path()
+    health = inspect_database(target)
+    if health["state"] == "ready":
+        return {"repaired": False, "reason": "database_is_healthy", "backups": []}
+    if health["state"] == "missing":
+        MetricsStore(target).initialize()
+        return {"repaired": True, "reason": "created_missing_database", "backups": []}
+
+    stamp = time.strftime(
+        "%Y%m%dT%H%M%SZ",
+        time.gmtime(float(now if now is not None else time.time())),
+    )
+    backups: list[str] = []
+    target.parent.mkdir(parents=True, exist_ok=True)
+    for source in (
+        target,
+        Path(str(target) + "-wal"),
+        Path(str(target) + "-shm"),
+    ):
+        if not source.exists():
+            continue
+        destination = source.with_name(source.name + f".corrupt-{stamp}")
+        source.replace(destination)
+        backups.append(str(destination))
+
+    MetricsStore(target).initialize()
+    repaired_health = inspect_database(target)
+    return {
+        "repaired": repaired_health["state"] == "ready",
+        "reason": "quarantined_corrupt_database",
+        "backups": backups,
+    }
 
 
 class MetricsStore:
@@ -277,6 +365,39 @@ class MetricsStore:
             """
         )
 
+    def _migrate_v4(self, con: sqlite3.Connection) -> None:
+        turn_columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(hermes_turns)").fetchall()
+        }
+        turn_additions = {
+            "provider": "TEXT",
+            "requested_model": "TEXT",
+            "response_model": "TEXT",
+            "api_mode": "TEXT",
+        }
+        for name, sql_type in turn_additions.items():
+            if name not in turn_columns:
+                con.execute(
+                    f"ALTER TABLE hermes_turns ADD COLUMN {name} {sql_type}"
+                )
+
+        sample_columns = {
+            str(row["name"])
+            for row in con.execute("PRAGMA table_info(benchmark_samples)").fetchall()
+        }
+        sample_additions = {
+            "hermes_provider": "TEXT",
+            "hermes_requested_model": "TEXT",
+            "hermes_response_model": "TEXT",
+            "hermes_api_mode": "TEXT",
+        }
+        for name, sql_type in sample_additions.items():
+            if name not in sample_columns:
+                con.execute(
+                    f"ALTER TABLE benchmark_samples ADD COLUMN {name} {sql_type}"
+                )
+
     def initialize(self) -> None:
         if self._initialized:
             return
@@ -300,6 +421,10 @@ class MetricsStore:
                 if version < 3:
                     self._migrate_v3(con)
                     self._set_schema_version(con, 3)
+                    version = 3
+                if version < 4:
+                    self._migrate_v4(con)
+                    self._set_schema_version(con, 4)
             self._initialized = True
 
     def touch_turn(
@@ -415,6 +540,44 @@ class MetricsStore:
                 (turn_key,),
             )
 
+    def record_runtime_identity(
+        self,
+        turn_key: str,
+        *,
+        provider: Any = None,
+        requested_model: Any = None,
+        response_model: Any = None,
+        api_mode: Any = None,
+    ) -> None:
+        """Store the first successful main-loop provider/model identity for a turn."""
+        def clean(value: Any) -> str | None:
+            if not isinstance(value, str):
+                return None
+            value = value.strip()
+            return value[:256] if value else None
+
+        values = (
+            clean(provider),
+            clean(requested_model),
+            clean(response_model),
+            clean(api_mode),
+        )
+        if all(value is None for value in values):
+            return
+        self.initialize()
+        with self._connection() as con:
+            con.execute(
+                """
+                UPDATE hermes_turns
+                SET provider = COALESCE(provider, ?),
+                    requested_model = COALESCE(requested_model, ?),
+                    response_model = COALESCE(response_model, ?),
+                    api_mode = COALESCE(api_mode, ?)
+                WHERE turn_key = ?
+                """,
+                (*values, turn_key),
+            )
+
     def add_usage(self, turn_key: str, usage: dict[str, Any] | None) -> None:
         if not isinstance(usage, dict):
             return
@@ -526,7 +689,17 @@ class MetricsStore:
         cutoff = float(now if now is not None else time.time()) - (days * 86400)
         with self._connection() as con:
             con.execute("DELETE FROM benchmark_samples WHERE started_at < ?", (cutoff,))
-            con.execute("DELETE FROM benchmark_runs WHERE created_at < ?", (cutoff,))
+            con.execute(
+                """
+                DELETE FROM benchmark_runs
+                WHERE created_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM benchmark_samples
+                      WHERE benchmark_samples.run_id = benchmark_runs.run_id
+                  )
+                """,
+                (cutoff,),
+            )
             con.execute("DELETE FROM jev_decisions WHERE created_at < ?", (cutoff,))
             con.execute("DELETE FROM hermes_turns WHERE started_at < ?", (cutoff,))
             con.execute("DELETE FROM mode_changes WHERE created_at < ?", (cutoff,))
@@ -544,6 +717,7 @@ class MetricsStore:
                     COALESCE(SUM(applied), 0) AS applied,
                     AVG(confidence) AS avg_confidence,
                     AVG(latency_ms) AS avg_latency,
+                    AVG(cost_usd) AS avg_cost,
                     SUM(cost_usd) AS total_cost
                 FROM jev_decisions AS jd
                 LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
@@ -552,6 +726,19 @@ class MetricsStore:
                 """,
                 (cutoff,),
             ).fetchone()
+
+            latency_rows = con.execute(
+                """
+                SELECT jd.latency_ms AS latency_ms
+                FROM jev_decisions AS jd
+                LEFT JOIN hermes_turns AS ht ON ht.turn_key = jd.turn_key
+                WHERE jd.created_at >= ?
+                  AND ht.benchmark_run_id IS NULL
+                  AND jd.latency_ms IS NOT NULL
+                ORDER BY jd.latency_ms ASC
+                """,
+                (cutoff,),
+            ).fetchall()
 
             turns = con.execute(
                 """
@@ -592,6 +779,15 @@ class MetricsStore:
             fallback=max(0, decision_count - applied),
             avg_confidence=_number(decisions["avg_confidence"]),
             avg_jev_latency_ms=_number(decisions["avg_latency"]),
+            p50_jev_latency_ms=_percentile(
+                [float(row["latency_ms"]) for row in latency_rows],
+                0.50,
+            ),
+            p95_jev_latency_ms=_percentile(
+                [float(row["latency_ms"]) for row in latency_rows],
+                0.95,
+            ),
+            avg_jev_cost_usd=_number(decisions["avg_cost"]),
             total_jev_cost_usd=_number(decisions["total_cost"]),
             avg_turn_duration_ms=_number(turns["avg_duration"]),
             avg_tool_calls=_number(turns["avg_tools"]),
@@ -986,6 +1182,10 @@ class MetricsStore:
                     cached_input_tokens = ?,
                     output_tokens = ?,
                     reasoning_tokens = ?,
+                    hermes_provider = ?,
+                    hermes_requested_model = ?,
+                    hermes_response_model = ?,
+                    hermes_api_mode = ?,
                     route_family = ?,
                     route_applied = ?,
                     jev_latency_ms = ?,
@@ -1007,6 +1207,10 @@ class MetricsStore:
                     _integer(turn["cached_input_tokens"]) if turn is not None else None,
                     _integer(turn["output_tokens"]) if turn is not None else None,
                     _integer(turn["reasoning_tokens"]) if turn is not None else None,
+                    turn["provider"] if turn is not None else None,
+                    turn["requested_model"] if turn is not None else None,
+                    turn["response_model"] if turn is not None else None,
+                    turn["api_mode"] if turn is not None else None,
                     turn["route_family"] if turn is not None else None,
                     int(turn["route_applied"] or 0) if turn is not None else None,
                     _number(decision["latency_ms"]) if decision is not None else None,
@@ -1050,6 +1254,10 @@ class MetricsStore:
             "cached_input_tokens": _integer(row["cached_input_tokens"]),
             "output_tokens": _integer(row["output_tokens"]),
             "reasoning_tokens": _integer(row["reasoning_tokens"]),
+            "hermes_provider": row["hermes_provider"],
+            "hermes_requested_model": row["hermes_requested_model"],
+            "hermes_response_model": row["hermes_response_model"],
+            "hermes_api_mode": row["hermes_api_mode"],
             "route_family": row["route_family"],
             "route_applied": (
                 None if row["route_applied"] is None else bool(row["route_applied"])

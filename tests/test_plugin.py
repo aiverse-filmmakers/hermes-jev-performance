@@ -63,7 +63,7 @@ class PluginTests(unittest.TestCase):
         command = ctx.commands["jev"]
         self.assertEqual(
             command["args_hint"],
-            "[status|on|off|shadow|stats|notice on|notice off|help]",
+            "[status|on|off|shadow|stats|doctor|notice on|notice off|help]",
         )
         self.assertIn("routing/performance", command["description"])
 
@@ -81,8 +81,7 @@ class PluginTests(unittest.TestCase):
             output = ctx.commands["jev"]["handler"]("status")
 
         self.assertEqual(ctx.settings, before)
-        self.assertIn("Phase: 6 (controls + telemetry)", output)
-        self.assertIn("Last route: none yet", output)
+        self.assertIn("Phase: 9 (hardening + packaging)", output)
 
     def test_degrades_without_optional_hook_and_cli_surfaces(self):
         module = load_root_plugin()

@@ -195,6 +195,10 @@ def _number_in(value: Any, lower: float, upper: float) -> bool:
 
 
 def _normalize_usage(usage: Any) -> dict[str, Any]:
+    # Provider usage is observability metadata, not part of the semantic decision.
+    # If OpenRouter omits it, preserve the valid decision and expose metrics as unavailable.
+    if usage is None:
+        return {}
     if type(usage) is not dict:
         raise JevError("invalid_response")
 

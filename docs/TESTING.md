@@ -192,3 +192,40 @@ Unsupported versions must be documented rather than patched ad hoc.
 - no open P0/P1 security or data-loss issues;
 - migrations tested from beta schema;
 - third-party attribution audit complete.
+
+
+## 10. Phase 9 hardening tests
+
+Phase 9 additionally requires:
+
+- native package layout and manifest version consistency;
+- `requires_hermes` floor validation;
+- no undeclared Python runtime dependency surface;
+- non-network doctor diagnostics;
+- doctor credential-presence checks that never return secret values;
+- corrupt SQLite detection without automatic mutation;
+- explicit corrupt-database quarantine/recreation;
+- healthy database repair refusal;
+- v1 -> v3 migration;
+- v2 -> v3 migration;
+- v3 migration idempotence;
+- Hermes supported/degraded/unsupported feature-state fixtures;
+- Jev timeout fail-open;
+- provider 429 fail-open;
+- provider 500 fail-open;
+- unexpected provider exception fail-open;
+- CI public-repository privacy/secret scan.
+
+The P9 live lifecycle gate is manual by design: install, enable, disable, re-enable and remove must be exercised through Hermes' actual plugin lifecycle on a supported installation before public beta.
+
+## 11. Batched live release gate
+
+`scripts/live_release_gate.py` is the canonical P1-P9 real-environment runner.
+
+Default execution is read-only on the active profile.
+
+`--lifecycle --ref <FULL_COMMIT_SHA>` runs clean install, doctor, disable, re-enable, mode cycling and removal inside an isolated temporary `HERMES_HOME`.
+
+`--live-jev` adds one explicit provider call. `--active-agent` adds real OFF/SHADOW/ON Hermes turns and restores the original mode.
+
+The remaining Telegram and dashboard UI confirmations stay manual and must not be inferred from headless CI.

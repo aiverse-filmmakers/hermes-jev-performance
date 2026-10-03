@@ -62,6 +62,9 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(stats.fallback, 0)
         self.assertEqual(stats.avg_confidence, 0.9)
         self.assertEqual(stats.avg_jev_latency_ms, 400)
+        self.assertEqual(stats.p50_jev_latency_ms, 400)
+        self.assertEqual(stats.p95_jev_latency_ms, 400)
+        self.assertAlmostEqual(stats.avg_jev_cost_usd, 0.00001)
         self.assertAlmostEqual(stats.total_jev_cost_usd, 0.00001)
         self.assertEqual(stats.avg_turn_duration_ms, 2000)
         self.assertEqual(stats.avg_tool_calls, 1)
@@ -79,6 +82,32 @@ class StoreTests(unittest.TestCase):
                 ("opaque-turn",),
             ).fetchone()
         self.assertEqual(turn, (300, 25, "complete", "filtered"))
+
+    def test_latency_percentiles_are_interpolated(self):
+        store, _ = self.make_store()
+        for index, latency in enumerate((100, 200, 300, 400, 500)):
+            key = f"turn-{index}"
+            store.touch_turn(key, "shadow", now=1000 + index)
+            store.record_decision(
+                turn_key=key,
+                mode="shadow",
+                decision=RoutingDecision(
+                    family="web",
+                    confidence=0.9,
+                    accepted=True,
+                    reason="accepted",
+                    latency_ms=latency,
+                    cost_usd=0.00001 * (index + 1),
+                ),
+                applied=False,
+                reason="shadow",
+                now=1000 + index + 0.1,
+            )
+        stats = store.summary(since_hours=1, now=1010)
+        self.assertEqual(stats.p50_jev_latency_ms, 300)
+        self.assertEqual(stats.p95_jev_latency_ms, 480)
+        self.assertAlmostEqual(stats.avg_jev_cost_usd, 0.00003)
+        self.assertAlmostEqual(stats.total_jev_cost_usd, 0.00015)
 
     def test_decision_is_unique_per_turn(self):
         store, _ = self.make_store()
@@ -125,6 +154,50 @@ class StoreTests(unittest.TestCase):
         stats = store.summary(since_hours=1000, now=200001)
         self.assertEqual(stats.turns, 1)
 
+    def test_retention_does_not_orphan_newer_benchmark_sample(self):
+        store, path = self.make_store()
+        store.start_benchmark_run(
+            run_id="long-run",
+            benchmark_version=1,
+            fixture_set_hash="a" * 64,
+            fixture_count=1,
+            repeats=2,
+            warmups=0,
+            environment={},
+            methodology={},
+            now=0,
+        )
+        store.plan_benchmark_sample(
+            sample_id="newer-sample",
+            run_id="long-run",
+            fixture_id="fixture",
+            family="none",
+            mode="off",
+            repeat_index=0,
+            order_index=0,
+            is_warmup=False,
+            now=200000,
+        )
+        store.cleanup(1, now=200001)
+        with sqlite3.connect(path) as con:
+            run_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_runs WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+            sample_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_samples WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+        self.assertEqual((run_count, sample_count), (1, 1))
+
+        store.cleanup(1, now=400000)
+        with sqlite3.connect(path) as con:
+            run_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_runs WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+            sample_count = con.execute(
+                "SELECT COUNT(*) FROM benchmark_samples WHERE run_id = 'long-run'"
+            ).fetchone()[0]
+        self.assertEqual((run_count, sample_count), (0, 0))
+
     def test_schema_has_no_content_columns(self):
         store, path = self.make_store()
         store.initialize()
@@ -144,7 +217,7 @@ class StoreTests(unittest.TestCase):
                 }
                 self.assertTrue(forbidden.isdisjoint(columns))
 
-    def test_v1_database_migrates_through_v3(self):
+    def test_v1_database_migrates_through_v4(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         path = Path(temp.name) / "metrics.sqlite3"
@@ -187,7 +260,174 @@ class StoreTests(unittest.TestCase):
             ).fetchone()[0]
 
         self.assertIn("route_reason", columns)
-        self.assertEqual(version, "3")
+        self.assertEqual(version, "4")
+
+    def test_v2_database_migrates_through_v4(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = Path(temp.name) / "metrics.sqlite3"
+
+        with sqlite3.connect(path) as con:
+            con.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            con.execute(
+                "INSERT INTO meta(key, value) VALUES('schema_version', '2')"
+            )
+            con.execute(
+                """
+                CREATE TABLE hermes_turns (
+                    turn_key TEXT PRIMARY KEY,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    mode TEXT NOT NULL,
+                    route_family TEXT,
+                    route_applied INTEGER NOT NULL DEFAULT 0,
+                    duration_ms REAL,
+                    llm_requests INTEGER NOT NULL DEFAULT 0,
+                    tool_calls INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    route_reason TEXT
+                )
+                """
+            )
+
+        store = MetricsStore(path)
+        store.initialize()
+
+        with sqlite3.connect(path) as con:
+            columns = {
+                row[1] for row in con.execute("PRAGMA table_info(hermes_turns)")
+            }
+            tables = {
+                row[0]
+                for row in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+
+        self.assertEqual(version, "4")
+        self.assertIn("benchmark_run_id", columns)
+        self.assertIn("benchmark_sample_id", columns)
+        self.assertIn("benchmark_fixture_id", columns)
+        self.assertIn("benchmark_warmup", columns)
+        self.assertIn("benchmark_runs", tables)
+        self.assertIn("benchmark_samples", tables)
+
+    def test_v3_database_migrates_to_v4(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = Path(temp.name) / "metrics.sqlite3"
+
+        with sqlite3.connect(path) as con:
+            con.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            con.execute(
+                "INSERT INTO meta(key, value) VALUES('schema_version', '3')"
+            )
+            con.execute(
+                """
+                CREATE TABLE hermes_turns (
+                    turn_key TEXT PRIMARY KEY,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    mode TEXT NOT NULL,
+                    route_family TEXT,
+                    route_applied INTEGER NOT NULL DEFAULT 0,
+                    duration_ms REAL,
+                    llm_requests INTEGER NOT NULL DEFAULT 0,
+                    tool_calls INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    route_reason TEXT,
+                    benchmark_run_id TEXT,
+                    benchmark_sample_id TEXT,
+                    benchmark_fixture_id TEXT,
+                    benchmark_warmup INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            con.execute(
+                """
+                CREATE TABLE benchmark_samples (
+                    sample_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    fixture_id TEXT NOT NULL,
+                    family TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    repeat_index INTEGER NOT NULL,
+                    order_index INTEGER NOT NULL,
+                    is_warmup INTEGER NOT NULL DEFAULT 0,
+                    started_at REAL NOT NULL,
+                    completed_at REAL,
+                    status TEXT NOT NULL,
+                    runner_duration_ms REAL,
+                    exit_code INTEGER,
+                    validation_passed INTEGER,
+                    hermes_duration_ms REAL,
+                    llm_requests INTEGER,
+                    tool_calls INTEGER,
+                    input_tokens INTEGER,
+                    cached_input_tokens INTEGER,
+                    output_tokens INTEGER,
+                    reasoning_tokens INTEGER,
+                    route_family TEXT,
+                    route_applied INTEGER,
+                    jev_latency_ms REAL,
+                    jev_cost_usd REAL,
+                    jev_confidence REAL,
+                    error_category TEXT
+                )
+                """
+            )
+
+        store = MetricsStore(path)
+        store.initialize()
+
+        with sqlite3.connect(path) as con:
+            turn_columns = {
+                row[1] for row in con.execute("PRAGMA table_info(hermes_turns)")
+            }
+            sample_columns = {
+                row[1] for row in con.execute("PRAGMA table_info(benchmark_samples)")
+            }
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+
+        self.assertEqual(version, "4")
+        for column in ("provider", "requested_model", "response_model", "api_mode"):
+            self.assertIn(column, turn_columns)
+        for column in (
+            "hermes_provider",
+            "hermes_requested_model",
+            "hermes_response_model",
+            "hermes_api_mode",
+        ):
+            self.assertIn(column, sample_columns)
+
+    def test_schema_v4_initialize_is_idempotent(self):
+        store, path = self.make_store()
+        store.initialize()
+        store._initialized = False
+        store.initialize()
+        with sqlite3.connect(path) as con:
+            version = con.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'"
+            ).fetchone()[0]
+            indexes = {
+                row[1]
+                for row in con.execute("PRAGMA index_list(hermes_turns)")
+            }
+        self.assertEqual(version, "4")
+        self.assertIn("idx_hermes_turns_benchmark_run", indexes)
 
     def test_newer_schema_fails_closed_for_store_only(self):
         temp = tempfile.TemporaryDirectory()
