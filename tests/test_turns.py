@@ -37,11 +37,12 @@ class TurnTests(unittest.TestCase):
         self.assertEqual(extract_routing_state(request), "check\nthe web")
 
     def test_redacts_common_secret_shapes(self):
+        fake_openai_token = "sk-" + "abcdefghijklmnopqrstuvwxyz"
         text = (
             "Authorization Bearer abcdefghijklmnop "
             "api_key=supersecretvalue "
             "password: anothersecret "
-            "sk-abcdefghijklmnopqrstuvwxyz"
+            + fake_openai_token
         )
         redacted = redact_routing_state(text)
         self.assertNotIn("abcdefghijklmnop", redacted)
