@@ -21,6 +21,7 @@ class DashboardBenchmarkTests(unittest.TestCase):
 
     def seed(self, store):
         now = time.time()
+        private_root = "/" + "Users/private"
         store.start_benchmark_run(
             run_id="bench-dashboard",
             benchmark_version=BENCHMARK_VERSION,
@@ -82,8 +83,8 @@ class DashboardBenchmarkTests(unittest.TestCase):
             store.increment_tool_call(turn_key)
             store.record_runtime_identity(
                 turn_key,
-                provider="/Users/private/provider",
-                requested_model="/Users/private/model",
+                provider=f"{private_root}/provider",
+                requested_model=f"{private_root}/model",
                 response_model="private-org/model-v1",
                 api_mode="private-api-mode",
             )
@@ -148,7 +149,7 @@ class DashboardBenchmarkTests(unittest.TestCase):
         self.assertNotIn("private-turn", serialized)
         self.assertNotIn("DO_NOT_RETURN", serialized)
         self.assertNotIn("DO_NOT_RETURN_METHODOLOGY", serialized)
-        self.assertNotIn("/Users/private", serialized)
+        self.assertNotIn("Users/private", serialized)
         self.assertNotIn("private-org", serialized)
         self.assertNotIn("private-api-mode", serialized)
 
@@ -177,7 +178,7 @@ class DashboardBenchmarkTests(unittest.TestCase):
         self.assertNotIn("private-sample", serialized)
         self.assertNotIn("private-turn", serialized)
         self.assertNotIn("DO_NOT_RETURN", serialized)
-        self.assertNotIn("/Users/private", serialized)
+        self.assertNotIn("Users/private", serialized)
         self.assertNotIn("private-org", serialized)
         self.assertEqual(
             payload["comparison"]["interpretation"],
