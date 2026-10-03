@@ -7,7 +7,6 @@ import hashlib
 import json
 import platform
 import statistics
-import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 import uuid
