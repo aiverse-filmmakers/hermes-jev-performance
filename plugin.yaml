@@ -1,12 +1,12 @@
 name: hermes-jev-performance
-version: 0.1.0-alpha.7
+version: 0.1.0-alpha.8
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
 description: Hermes-native Jev tool routing and performance observability.
 license: MIT
 homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
-tags: [jev, routing, observability, performance, openrouter]
+tags: [jev, routing, compaction, observability, performance, openrouter]
 provides_middleware:
   - llm_request
 provides_hooks:
@@ -49,3 +49,43 @@ config_schema:
     type: bool
     default: true
     description: "Whether local metadata-only performance telemetry is enabled."
+  compaction_mode:
+    type: str
+    default: off
+    description: "Independent experimental compaction mode; requires native context engine selection. Global routing OFF suspends Jev calls."
+  compaction_drop_confidence:
+    type: float
+    default: 0.90
+    description: "Minimum archive probability; uncertain output stays verbatim."
+  compaction_min_drop_chars:
+    type: int
+    default: 1500
+    description: "Outputs below this size stay verbatim."
+  compaction_preview_chars:
+    type: int
+    default: 600
+    description: "Combined head/tail preview size sent to Jev after redaction."
+  compaction_preserve_recent_messages:
+    type: int
+    default: 6
+    description: "Minimum protected tail rows, expanded to a complete user exchange."
+  compaction_max_state_tokens:
+    type: int
+    default: 14000
+    description: "Conservative estimated decision-state token budget."
+  compaction_max_request_tokens:
+    type: int
+    default: 30000
+    description: "Conservative estimated full request token budget."
+  compaction_min_reduction_ratio:
+    type: float
+    default: 0.25
+    description: "Minimum estimated reduction before replacing output with archive references."
+  compaction_max_batches:
+    type: int
+    default: 8
+    description: "Maximum sequential decision batches per compaction."
+  compaction_deadline_seconds:
+    type: float
+    default: 10.0
+    description: "Total bounded Jev decision budget per compaction attempt."

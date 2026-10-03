@@ -98,5 +98,10 @@
     "id": "multi-2",
     "family": "multi",
     "prompt": "Inspect the GitHub issue, compare it with the public documentation, then write a local report."
+  },
+  {
+    "id": "none-of-these-1",
+    "family": "none_of_these",
+    "prompt": "Use the unrecognized custom workflow mentioned elsewhere; its tool requirements are unspecified."
   }
 ]

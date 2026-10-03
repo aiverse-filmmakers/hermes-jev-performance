@@ -16,11 +16,13 @@ ROUTING_FAMILIES = (
     "media",
     "none",
     "multi",
+    "none_of_these",
 )
 
-UNRESTRICTED_FAMILIES = frozenset({"none", "multi"})
+UNRESTRICTED_FAMILIES = frozenset({"none", "multi", "none_of_these"})
 
 FAMILY_CRITERIA: dict[str, str] = {
+    "none_of_these": "None of these categories fits, the request is ambiguous, or evidence is insufficient. Leave all tools available.",
     "github": (
         "GitHub repository work: repositories, pull requests, issues, Actions/workflows, "
         "commits, branches, releases, code changes, or GitHub inspection. Choose this only "
@@ -80,6 +82,7 @@ ALWAYS_KEEP = frozenset({
     "tool_search",
     "tool_describe",
     "tool_call",
+    "jev_recover",
 })
 
 FAMILY_EXACT: dict[str, frozenset[str]] = {

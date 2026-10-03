@@ -7,12 +7,17 @@ from typing import Any
 from .cli import build_cli
 from .commands import build_command_handler
 from .compatibility import detect_compatibility
+from .context_engine import register_compaction_engine
 from .middleware import RoutingMiddleware
 from .notice import build_notice_hook
 from .telemetry import TelemetryObserver
 
 
 def register_plugin(ctx: Any) -> None:
+    # Hermes' dedicated engine loader supplies an engine-only collector, not PluginContext.
+    if not callable(getattr(ctx, "get_config", None)) and callable(getattr(ctx, "register_context_engine", None)):
+        register_compaction_engine(ctx)
+        return
     compat = detect_compatibility(ctx)
     if not compat["phase1_supported"]:
         raise RuntimeError(
@@ -22,12 +27,13 @@ def register_plugin(ctx: Any) -> None:
 
     telemetry = TelemetryObserver(ctx)
     router_middleware = RoutingMiddleware(ctx, telemetry=telemetry)
+    register_compaction_engine(ctx)
 
     ctx.register_command(
         "jev",
         build_command_handler(ctx, router_middleware, telemetry),
         description="Jev routing/performance status and controls.",
-        args_hint="[status|on|off|shadow|stats|doctor|notice on|notice off|help]",
+        args_hint="[status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|notice on|notice off|help]",
     )
 
     register_middleware = getattr(ctx, "register_middleware", None)

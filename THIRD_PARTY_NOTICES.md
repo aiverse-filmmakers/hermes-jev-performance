@@ -36,6 +36,13 @@ Substantial code copied or adapted from an upstream project must retain that pro
 - Documentation: https://docs.typesafe.ai/
 - Jev is TypeSafe's decision model. This project is a client/integration and does not claim ownership of the model or its trademarks.
 
+## jev-compaction-plus / fast-jev-compaction
+
+- Repositories: https://github.com/cth9191/jev-compaction-plus and https://github.com/tamaratran/fast-jev-compaction
+- License: MIT
+- Copyright: Copyright (c) 2026 cth9191; Copyright (c) 2025 tamara tran
+- Intended reuse: per-output Jev relevance questions, bounded previews, small-result retention, and recoverable drawer semantics. The Hermes adapter and archive safety policy are independently implemented in `jevperf/compaction.py`, `jevperf/compaction_archive.py`, and `jevperf/context_engine.py`.
+
 ## OpenRouter
 
 - Website: https://openrouter.ai/

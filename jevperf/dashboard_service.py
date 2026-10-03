@@ -10,6 +10,8 @@ from . import __version__
 from .benchmark import calculate_comparison
 from .benchmark_export import build_anonymized_export
 from .config import VALID_MODES, ConfigSnapshot, read_config
+from .compaction_config import read_compaction_config
+from .compaction_metrics import compaction_summary
 from .store import MetricsStore, SCHEMA_VERSION, StatsSummary, default_db_path
 
 
@@ -120,6 +122,12 @@ def status_payload(
     store: MetricsStore | None = None,
 ) -> dict[str, Any]:
     config = read_dashboard_config(field_loader)
+    compaction = read_compaction_config(_MappingContext(_settings_values(field_loader)))
+    try:
+        compaction_metrics = compaction_summary(
+            None if store is None else store.path.with_name("compaction.sqlite3"))
+    except Exception:
+        compaction_metrics = {"error": "metrics_unavailable"}
     try:
         summary = summary_payload(hours=24, store=store)
         database_state = summary["database_state"]
@@ -155,7 +163,24 @@ def status_payload(
             "error": telemetry_error,
         },
         "summary_24h": summary,
+        "compaction": {"mode": compaction.mode, "suspended_by_global_off": config.mode == "off",
+                       "drop_confidence": compaction.drop_confidence,
+                       "warnings": list(compaction.warnings), "summary_24h": compaction_metrics,
+                       "engine_selection_required": True},
     }
+
+
+def set_dashboard_compaction_mode(mode: str, *, settings_writer=None, field_loader=None) -> dict:
+    if mode not in VALID_MODES:
+        raise ValueError("mode must be one of: off, shadow, on")
+    if settings_writer is None:
+        from hermes_cli.plugins_settings import save_plugin_settings
+        settings_writer = save_plugin_settings
+    settings_writer(PLUGIN_ID, PLUGIN_ROOT, {"compaction_mode": mode})
+    after = read_compaction_config(_MappingContext(_settings_values(field_loader)))
+    if after.mode != mode:
+        raise RuntimeError("compaction mode write did not pass read-back verification")
+    return {"mode": after.mode, "engine_selection_required": True}
 
 
 def set_dashboard_mode(

@@ -19,7 +19,7 @@ def responses_tool(name):
 class FamilyTests(unittest.TestCase):
     def test_all_routing_families_have_criteria(self):
         self.assertEqual(set(ROUTING_FAMILIES), set(FAMILY_CRITERIA))
-        self.assertEqual(len(ROUTING_FAMILIES), 10)
+        self.assertEqual(len(ROUTING_FAMILIES), 11)
 
     def test_extracts_both_common_tool_schema_names(self):
         self.assertEqual(tool_name(chat_tool("web_search")), "web_search")
@@ -88,7 +88,7 @@ class FamilyTests(unittest.TestCase):
 
     def test_none_and_multi_are_never_filtered(self):
         tools = [responses_tool("web_search"), responses_tool("terminal")]
-        for family in ("none", "multi"):
+        for family in ("none", "multi", "none_of_these"):
             with self.subTest(family=family):
                 filtered, applied, reason = filter_tools(tools, family)
                 self.assertIs(filtered, tools)

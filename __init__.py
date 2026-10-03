@@ -1,6 +1,7 @@
 """Hermes Jev Performance plugin entry point.
 
-Phase 1 intentionally performs no network I/O and registers no routing middleware.
+Also exposes the native ContextEngine through register_context_engine when supported.
+Selecting it remains an explicit Hermes context.engine setting.
 """
 
 from .jevperf.plugin import register_plugin

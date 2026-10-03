@@ -92,12 +92,13 @@ class DashboardApiContractTests(unittest.TestCase):
                 ("GET", "/benchmarks"),
                 ("GET", "/benchmarks/{run_id}/export"),
                 ("PUT", "/mode"),
+                ("PUT", "/compaction"),
             },
         )
 
     def test_every_backend_route_enforces_selected_profile_scope(self):
         source = PLUGIN_API.read_text(encoding="utf-8")
-        self.assertEqual(source.count("_ensure_profile_scope(profile)"), 6)
+        self.assertEqual(source.count("_ensure_profile_scope(profile)"), 7)
 
     def test_named_profile_is_allowed_when_host_scope_matches(self):
         module = load_api_module()

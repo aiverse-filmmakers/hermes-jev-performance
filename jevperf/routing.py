@@ -16,6 +16,7 @@ ROUTING_QUESTION = choice_question(
         "Choose multi whenever completing the request genuinely requires more than "
         "one distinct tool family or restricting the turn to one family could block a "
         "necessary later step. Choose none only when no tool is needed."
+        " Choose none_of_these when no category fits or evidence is insufficient; never force a category."
     ),
     FAMILY_CRITERIA,
 )
@@ -40,7 +41,7 @@ class RoutingDecision:
 
     @property
     def can_filter(self) -> bool:
-        return self.accepted and self.family not in {None, "none", "multi"}
+        return self.accepted and self.family not in {None, "none", "multi", "none_of_these"}
 
 
 class JevRouter:

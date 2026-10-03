@@ -6,6 +6,18 @@ The plugin sits on the agent request path, so correctness means more than "Jev r
 
 ## 2. Test layers
 
+### Native compaction contract
+
+Run the project tests, then test the context engine against the installed Hermes source in an isolated temporary profile:
+
+```bash
+python3 -m unittest discover -s tests -q
+python3 scripts/verify_native_compaction.py --hermes-source /path/to/hermes-agent
+python3 scripts/benchmark_compaction.py
+```
+
+The native contract covers engine discovery, per-agent cloning, multi-tool IDs, stale replay sidecars, archive recovery after a fresh engine instance, concurrent database appends, and OFF/SHADOW/provider-failure fallback. The benchmark is synthetic and offline by default; it reports exact-fact recall and recovery rather than claiming production accuracy.
+
 ### Unit tests
 
 Cover pure modules without Hermes or network:

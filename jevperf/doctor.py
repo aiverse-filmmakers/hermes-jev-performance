@@ -22,6 +22,7 @@ from .compatibility import (
     version_meets_floor,
 )
 from .config import read_config
+from .compaction_config import read_compaction_config
 from .credentials import resolve_openrouter_credential
 from .store import (
     SCHEMA_VERSION,
@@ -166,6 +167,15 @@ def run_doctor(
         )
 
     checks.append(_python_check())
+    compaction = read_compaction_config(ctx)
+    engine_surface = callable(getattr(ctx, "register_context_engine", None))
+    checks.append(_check(
+        "compaction_engine", "pass" if compaction.mode == "off" or engine_surface else "warn",
+        f"experimental mode={compaction.mode}; native registration={'available' if engine_surface else 'unavailable'}; "
+        "activation also requires context.engine: hermes-jev-performance and agent restart",
+    ))
+    if compaction.warnings:
+        checks.append(_check("compaction_configuration", "warn", ", ".join(compaction.warnings)))
 
     manifest = root / "plugin.yaml"
     manifest_version = _manifest_version(root)

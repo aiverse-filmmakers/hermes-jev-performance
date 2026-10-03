@@ -22,12 +22,25 @@ from jevperf.dashboard_service import (  # noqa: E402
     benchmark_export_payload,
     benchmark_runs_payload,
     set_dashboard_mode,
+    set_dashboard_compaction_mode,
     status_payload,
     summary_payload,
 )
 
 
 router = APIRouter()
+
+
+@router.put("/compaction")
+async def put_compaction_mode(payload: dict[str, Any], profile: str | None = Query(default=None)) -> dict[str, Any]:
+    _ensure_profile_scope(profile)
+    mode = payload.get("mode") if isinstance(payload, dict) else None
+    if mode not in {"off", "shadow", "on"}:
+        raise HTTPException(status_code=400, detail="mode must be one of: off, shadow, on")
+    try:
+        return set_dashboard_compaction_mode(mode)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Compaction settings unavailable")
 
 
 def _ensure_profile_scope(profile: str | None) -> None:

@@ -190,6 +190,37 @@
     );
   }
 
+  function CompactionPanel(props) {
+    const data = props.data || {};
+    const stats = data.summary_24h || {};
+    return h(C.Card, { className: "jv-panel-card" },
+      h(C.CardHeader, null, h(C.CardTitle, null, "Recoverable compaction · experimental")),
+      h(C.CardContent, null,
+        h("p", { className: "jv-mode-help" },
+          "Keep useful output word for word and archive older output for exact recovery. ",
+          "Activate the Jev context engine in Hermes settings and restart before testing."
+        ),
+        h("div", { className: "jv-mode-control", role: "group", "aria-label": "Jev compaction mode" },
+          ["off", "shadow", "on"].map(function (mode) {
+            return h("button", { key: mode, type: "button", disabled: props.busy,
+              className: "jv-mode-button" + (data.mode === mode ? " is-active" : ""),
+              "aria-pressed": data.mode === mode,
+              onClick: function () { props.onChange(mode); } }, mode.toUpperCase());
+          })
+        ),
+        h("p", { className: "jv-mode-help" }, data.suspended_by_global_off
+          ? "Suspended: global Jev mode is OFF."
+          : "SHADOW measures decisions and leaves output unchanged. Archives are private to this Hermes profile."),
+        h("div", { className: "jv-config-grid" },
+          h("div", null, h("span", null, "24h attempts"), h("strong", null, fmtInt(stats.attempts))),
+          h("div", null, h("span", null, "Applied / fallback"), h("strong", null, fmtInt(stats.applied) + " / " + fmtInt(stats.fallback))),
+          h("div", null, h("span", null, "Estimated context tokens saved"), h("strong", null, fmtInt(stats.estimated_tokens_saved))),
+          h("div", null, h("span", null, "Average decision time"), h("strong", null, fmtMs(stats.avg_latency_ms)))
+        )
+      )
+    );
+  }
+
   function Sparkline(props) {
     const rows = Array.isArray(props.rows) ? props.rows : [];
     const points = [];
@@ -531,6 +562,21 @@
         });
     }
 
+    function changeCompactionMode(mode) {
+      if (!data || busy) return;
+      setBusy(true);
+      setFeedback(null);
+      SDK.fetchJSON(apiUrl("/compaction"), { method: "PUT",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: mode }) })
+        .then(function (result) {
+          if (!result || result.mode !== mode) throw new Error("Compaction mode read-back failed");
+          setFeedback("Compaction changed to " + mode.toUpperCase() + ". Native engine selection is required.");
+          return load(true);
+        })
+        .catch(function (err) { setError(String(err && err.message ? err.message : err)); })
+        .finally(function () { setBusy(false); });
+    }
+
     if (loading && !data) {
       return h("div", { className: "jv-page" },
         h("div", { className: "jv-loading" },
@@ -585,6 +631,7 @@
       error && h("div", { className: "jv-alert jv-alert-error", role: "alert" }, error),
       feedback && h("div", { className: "jv-alert jv-alert-success", role: "status" }, feedback),
 
+      h(CompactionPanel, { data: data.compaction, busy: busy, onChange: changeCompactionMode }),
       h(StatusPanel, {
         data: data,
         busy: busy,

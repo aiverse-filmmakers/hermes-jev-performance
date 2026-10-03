@@ -52,13 +52,17 @@ Those are not the same metric and must never be conflated.
 - Baseline comparison and controlled benchmark support.
 - Packaging, doctor/self-check, migration, and uninstall path.
 
+### Experimental compaction extension
+
+The project now includes a separately configured, OFF-by-default Hermes `ContextEngine` named `hermes-jev-performance`. It applies Jev yes/no judgments to older large tool outputs, preserves recent exchanges and small/error outputs, writes exact outputs to profile-private storage before replacing them with references, and provides the `jev_recover` tool. SHADOW leaves the transcript unchanged; ON requires successful archive writes and otherwise falls back to normal Hermes compression. This extension remains experimental until live resume, provider, and lifecycle gates pass.
+
 ### Explicitly deferred
 
 - Automatic primary-model/provider switching.
 - Generic OpenAI/Anthropic proxy mode.
 - Hosted telemetry.
 - Fleet-wide centralized analytics.
-- Memory reranking, web-injection screening, compaction selection, GUI control, browser control, mailbox triage, or policy gates from upstream projects.
+- Memory reranking, web-injection screening, GUI control, browser control, mailbox triage, or policy gates from upstream projects.
 - Automatic remote dashboard exposure.
 
 These may become later modules only through an ADR and separate milestone.

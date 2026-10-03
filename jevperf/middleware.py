@@ -197,7 +197,7 @@ class RoutingMiddleware:
                 return None
 
             if not decision.can_filter:
-                if decision.accepted and decision.family in {"none", "multi"}:
+                if decision.accepted and decision.family in {"none", "multi", "none_of_these"}:
                     reason = f"unrestricted_{decision.family}"
                 else:
                     reason = decision.reason

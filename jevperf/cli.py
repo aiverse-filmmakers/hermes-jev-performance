@@ -9,8 +9,9 @@ from typing import Any
 
 from .benchmark_export import write_anonymized_export
 from .benchmark_runner import benchmark_plan_summary, run_live_benchmark
-from .commands import render_stats, render_status, set_mode, set_notice
+from .commands import compaction_control, render_stats, render_status, set_mode, set_notice
 from .doctor import render_doctor, run_doctor
+from .compaction_benchmark import render_probe, run_compaction_probe
 from .smoke import run_smoke
 
 
@@ -33,6 +34,10 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         sub.add_parser("off", help="Disable Jev routing.")
         sub.add_parser("shadow", help="Run Jev decisions without changing Hermes tools.")
         sub.add_parser("stats", help="Show local Jev/Hermes performance stats.")
+        compaction = sub.add_parser("compaction", help="Configure experimental recoverable tool-output compaction.")
+        compaction.add_argument("state", nargs="?", default="status", choices=("status", "off", "shadow", "on"))
+        probe = sub.add_parser("compaction-benchmark", help="Synthetic exact-recall and recovery probe; offline by default.")
+        probe.add_argument("--live", action="store_true", help="Send only synthetic fixture data to OpenRouter Jev (paid).")
         sub.add_parser(
             "smoke",
             help="Explicitly make one live OpenRouter Jev Decisions API call.",
@@ -85,6 +90,17 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         if action == "stats":
             print(render_stats(telemetry))
             return 0
+        if action == "compaction":
+            print(compaction_control(ctx, getattr(args, "state", "status")))
+            return 0
+        if action == "compaction-benchmark":
+            from .config import read_config
+            config = read_config(ctx)
+            report = run_compaction_probe(live=bool(getattr(args, "live", False)),
+                                          model=config.model, timeout=config.timeout_seconds)
+            print(render_probe(report))
+            arm = report["arms"][-1]
+            return 0 if arm.get("outcome") == "applied" and arm["critical_recall"] == report["critical_facts"] else 1
         if action == "smoke":
             code, payload = run_smoke()
             print(json.dumps(payload, indent=2, sort_keys=True))

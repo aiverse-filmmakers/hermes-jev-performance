@@ -1,6 +1,6 @@
 # Implementation Status
 
-**Current stage:** Phase 9 - hardening, native packaging, diagnostics and recovery implemented; live lifecycle/integration gates remain pending.
+**Current stage:** Phase 9 hardening plus the experimental recoverable-compaction extension are implemented and verified against Hermes 0.21.5 source/runtime; live lifecycle/provider/session gates remain pending.
 
 ## Phase status
 
@@ -31,6 +31,8 @@
 - local SQLite performance metadata.
 - native Hermes dashboard extension.
 - controlled benchmark separated from observational data.
+- experimental native `ContextEngine` compaction with private archive recovery and bounded Jev previews.
+- explicit `none_of_these` routing choice and decision-opportunity audit.
 
 ## Current blockers
 

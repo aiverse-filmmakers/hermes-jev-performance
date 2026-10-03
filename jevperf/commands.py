@@ -6,11 +6,13 @@ from typing import Any
 
 from .compatibility import detect_compatibility
 from .config import VALID_MODES, read_config
+from .compaction_config import read_compaction_config
+from .compaction_metrics import compaction_summary
 from .doctor import render_doctor, run_doctor
 
 
 USAGE = (
-    "Usage: /jev [status|on|off|shadow|stats|doctor|notice on|notice off|help]"
+    "Usage: /jev [status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|notice on|notice off|help]"
 )
 
 
@@ -46,6 +48,7 @@ def render_status(ctx: Any, router_middleware: Any = None) -> str:
             f"Persistent settings surface: {persistent_settings}",
             f"Config warnings: {warnings}",
             "Phase: 9 (hardening + packaging)",
+            f"Compaction: {read_compaction_config(ctx).mode} (experimental; native context engine required)",
         ]
     )
 
@@ -131,6 +134,33 @@ def set_notice(ctx: Any, enabled: bool) -> str:
     return f"Jev reply notice: {'ON' if enabled else 'OFF'}"
 
 
+def compaction_control(ctx: Any, action: str = "status") -> str:
+    if action in VALID_MODES:
+        if not _set_setting(ctx, "compaction_mode", action):
+            return "Compaction mode could not be changed: persistent settings are unavailable."
+        return (f"Jev compaction: {action.upper()}. Select context.engine: hermes-jev-performance "
+                "in Hermes config and restart the agent/gateway to activate the native engine. "
+                "Global /jev off suspends all Jev calls.")
+    if action != "status":
+        return USAGE
+    config = read_compaction_config(ctx)
+    try:
+        metrics = compaction_summary()
+    except Exception:
+        metrics = {}
+    return "\n".join([
+        "Jev compaction (experimental)", f"Mode: {config.mode}",
+        "Native engine selection: context.engine: hermes-jev-performance (restart required)",
+        f"Global OFF suspension: {'yes' if read_config(ctx).mode == 'off' else 'no'}",
+        f"Drop confidence: {config.drop_confidence:.2f}",
+        f"Small outputs kept: below {config.min_drop_chars} characters",
+        f"24h attempts/applied/fallback: {metrics.get('attempts', 'n/a')} / {metrics.get('applied', 'n/a')} / {metrics.get('fallback', 'n/a')}",
+        f"Estimated context tokens saved: {metrics.get('estimated_tokens_saved', 'n/a')}",
+        "Archives: private profile storage; recovery tool: jev_recover; no automatic deletion",
+        f"Config warnings: {', '.join(config.warnings) or 'none'}",
+    ])
+
+
 def handle_jev_command(
     ctx: Any,
     raw: Any = "",
@@ -145,6 +175,8 @@ def handle_jev_command(
         return set_mode(ctx, text, telemetry, source="slash")
     if text == "stats":
         return render_stats(telemetry)
+    if text == "compaction" or text.startswith("compaction "):
+        return compaction_control(ctx, text.partition(" ")[2] or "status")
     if text == "doctor":
         try:
             return render_doctor(run_doctor(ctx))

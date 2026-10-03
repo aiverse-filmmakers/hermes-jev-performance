@@ -43,6 +43,32 @@ The plugin defaults to SHADOW on first install.
 
 SHADOW calls Jev and records routing telemetry but does not change Hermes' eager tool list.
 
+## Try recoverable compaction
+
+Compaction is off by default. Add this to the Hermes profile configuration and restart Hermes:
+
+```yaml
+context:
+  engine: hermes-jev-performance
+```
+
+Then start with:
+
+```text
+/jev compaction status
+/jev compaction shadow
+```
+
+SHADOW leaves the transcript unchanged while exercising the decision path. To apply compaction after reviewing the status output, use `/jev compaction on`. Old tool outputs are archived privately and can be recovered through the `jev_recover` tool exposed to the agent. Disable it at any time with `/jev compaction off`.
+
+The offline synthetic check is safe to run without credentials:
+
+```bash
+python3 scripts/benchmark_compaction.py
+```
+
+Add `--live` only when you intentionally want a paid OpenRouter Jev request.
+
 ## Enable / disable
 
 Enable:
