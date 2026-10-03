@@ -1,29 +1,30 @@
 # Implementation and verification status
 
-**Package split and code checks are implemented. This is not yet a production-verified release.** Python unit tests, JavaScript syntax checks, public repository scan, and Hermes' plugin doctor have passed locally. The Hermes doctor was run against isolated temporary profiles for both the server-only folder and the combined repository package.
+**The corrected packages are an alpha test candidate. Production verification still requires the real Desktop/VPS checks below.** Official source: `aiverse-filmmakers/hermes-jev-performance`, branch `main`.
 
-## What is available in this repository
+## Available components
 
-- **Server only:** `agent/`, for the selected Hermes backend or VPS. It includes routing, compaction, commands, metrics API, and only a tiny hidden browser-loader shim. New installs start with routing and compaction OFF.
-- **Desktop dashboard:** `desktop/`, a native Hermes Desktop panel that uses the selected authenticated connection and profile.
-- **Combined local install:** the repository root, for Hermes and Hermes Desktop on the same computer.
+- **Server only:** `agent/`, for the Hermes backend/VPS. Routing, compaction, commands, metrics API, and a 73-byte hidden browser-loader shim. No visual UI bundles, tests, or benchmark fixtures. New routing and compaction modes are the string `off`.
+- **Desktop dashboard:** `desktop/`, a native panel using the active authenticated gateway/profile. No local model is required to view a VPS backend.
+- **Combined local:** repository root, for a local Hermes backend and Desktop on the same computer. The legacy browser dashboard remains available in this combined distribution.
 
-## Verified so far
+## Repository checks
 
-- Python tests: 228 passing on the current local runtime.
-- Hermes plugin doctor: server-only and combined source packages load and register against isolated temporary profiles.
-- JavaScript syntax: native Desktop source, legacy web dashboard bundle, and server shim parse successfully.
-- Repository diff whitespace check passes.
-- Version fields match across the combined and server manifests and dashboard manifests.
-- The server dashboard shim is tested as a hidden, null-rendering registration. The Server only ZIP is 73,155 bytes; Desktop only is 4,309 bytes; combined local is 93,850 bytes. Each has a SHA-256 checksum and file inventory.
+- Python behavioral/package tests pass, including extracted package loading and deterministic ZIP checks.
+- Desktop behavior tests exercise the delivered ESM file with an isolated SDK/hook harness. They cover REST/display scope, stale reads/read-back, write guards, overlapping refreshes, unload cleanup, empty states, and benchmark labels. These are not visual app tests.
+- Native Hermes contracts verify YAML defaults, actual plugin loader migration/unload/reload with modes/metrics/archives/unrelated-plugin preservation, legacy settings, managed permissions, and real FastAPI authenticated API mounting/body validation.
+- Native compaction contracts exercise the actual Hermes engine, resume/recovery, normal fallback, and session-store behavior with synthetic data and no network.
+- Version/schema inputs, Python compilation, JavaScript syntax, public repository scan, document-link validation, and diff checks pass.
+- Builds contain one installable `hermes-jev-performance` folder. Check each release's `release-manifest.json`, inventory, and SHA-256 files for exact sizes and checksums. Source timestamps and permissions do not alter the ZIP bytes.
+
+For exact commands and test counts from the correction run, see [TESTING.md](TESTING.md#installation-split-correction-checks).
 
 ## Still needs a real app or service
 
-- Hermes Desktop must install and visually render the panel; light/dark appearance, narrow-window layout, and keyboard interaction need an app-level check.
-- A real Desktop session must verify the selected VPS connection, authenticated status reads, and scoped mode changes.
-- The three Hermes install dialogs/links and component detection must be checked in the supported Desktop release.
-- A real Hermes lifecycle must check upgrade, disable, re-enable, removal, and persistence. Do not run it against a member's everyday profile as a substitute for an isolated install.
-- A live Jev provider request has not been run; it may incur charges and requires an intentionally configured credential.
-- Release ZIPs have been built and inspected locally. A tagged downloadable GitHub release waits for the real Desktop install/render and remote-backend checks.
+- Branded Hermes Desktop install dialogs and actual panel discovery/rendering, including light/dark appearance, narrow layout, keyboard navigation, and unload behavior.
+- Actual selected VPS connection/authentication and scoped read/write on a remote gateway.
+- Native installer admission, source/provenance migration, Desktop reconciliation, update/remove, and real process restart. Offline module loading proves a narrower contract.
+- A deliberately configured live Jev provider request, which may incur charges. No such request was run during the repository correction.
+- A stable release remains gated on those checks. Any published alpha assets are test candidates and must say so.
 
-Until those items pass, describe the repository as an implementation/test candidate, not as production-ready or a stable release. Use the instructions in the [README](../README.md) and report any mismatch in the install dialog.
+Repository corrections and offline tests have not installed or enabled the plugin in the user's Hermes environments.

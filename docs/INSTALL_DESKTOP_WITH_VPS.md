@@ -8,6 +8,8 @@ This installs the visual Jev panel on your computer and keeps Jev's work and dat
 - A working connection to the Hermes VPS.
 - The Jev Performance **Server only** component installed and enabled on the VPS/profile you want to manage.
 
+Desktop 0.17 source contracts and Agent 0.21.5+ backend contracts have been inspected. Real app installation, theme/keyboard checks, and a live VPS request still need verification; read the [current status](STATUS.md).
+
 ## Install
 
 1. In Hermes Desktop, keep or select your existing VPS connection.
@@ -38,3 +40,17 @@ You can add the dashboard file using Finder; no terminal is needed:
 5. Return to **Settings → Plugins**, click **Rescan**, and turn on **Jev Performance**.
 
 To update this manual installation later, replace the `plugin.js` file with the latest one from the same official link and click **Rescan**. If the buttons in your Hermes Desktop look different, check the official [Hermes plugin instructions](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins) before proceeding.
+
+## Setup and success state
+
+The panel should show your selected VPS/profile and its Server version, followed by a setup checklist. Credentials stay on the VPS: use that backend's secure credential/environment editor for `OPENROUTER_JEV_API_TOKEN` or its existing `OPENROUTER_API_KEY`. The panel reports presence only.
+
+New Server installs start Off. Shadow makes provider requests without applying decisions and can incur charges. On applies accepted decisions. Compaction also needs `context.engine` set to `hermes-jev-performance` in that backend/profile and an agent restart. A different custom engine must be replaced deliberately. Global routing Off suspends compaction calls even if its separate saved mode is enabled.
+
+## Updates and removal
+
+To update a manual panel, replace only `plugin.js` from the official source and click **Rescan**. For an installer-managed panel, use Hermes' supported updater or its install dialog to replace the existing Desktop component; verify that it targets this computer. The exact GUI update lifecycle has not yet been tested in the app.
+
+To disable, turn off **Jev Performance** in the Desktop plugins list. To remove a manual panel, disable it, click **Open plugins folder**, delete only the `hermes-jev-performance` folder there, then **Rescan**. Keep the VPS Server component enabled if you still want backend optimization. Server metrics and archives are stored separately on that backend.
+
+For missing, disabled, incompatible, disconnected, or wrong-profile states, use the [troubleshooting guide](TROUBLESHOOTING.md).

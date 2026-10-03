@@ -8,6 +8,21 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class PackagingTests(unittest.TestCase):
+    def test_manifests_are_generated_from_shared_typed_defaults(self):
+        from scripts.sync_manifests import sync
+        sync(check=True)
+        spec = json.loads((ROOT / "packaging/plugin-manifest.json").read_text())
+        from jevperf import __version__
+        self.assertEqual(spec["version"], __version__)
+        for key in ("mode", "compaction_mode"):
+            self.assertIs(type(spec["config_schema"][key]["default"]), str)
+            self.assertEqual(spec["config_schema"][key]["default"], "off")
+        for manifest in (ROOT / "plugin.yaml", ROOT / "agent/plugin.yaml"):
+            self.assertIn('default: "off"', manifest.read_text())
+            self.assertNotRegex(manifest.read_text(), r"(?m)^\s*default: off$")
+        source = (ROOT / "desktop/plugin.js").read_text()
+        self.assertIn("export const VERSION = '" + __version__ + "'", source)
+
     def test_native_hermes_package_layout_is_complete(self):
         required = [
             ROOT / "plugin.yaml",
@@ -20,6 +35,7 @@ class PackagingTests(unittest.TestCase):
             ROOT / "agent" / "dashboard" / "server-only.js",
             ROOT / "desktop" / "plugin.js",
             ROOT / "desktop" / "README.md",
+            ROOT / "desktop" / "LICENSE",
             ROOT / "after-install.md",
             ROOT / "dashboard" / "manifest.json",
             ROOT / "dashboard" / "plugin_api.py",

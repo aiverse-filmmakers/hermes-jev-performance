@@ -80,6 +80,8 @@ def _dashboard_check(root: Path) -> DoctorCheck:
 
 
 def _fixture_check(path: Path) -> DoctorCheck:
+    if not path.is_file():
+        return _check("benchmark_fixtures", "pass", "optional benchmark suite not installed; provide --fixtures to benchmark")
     try:
         local = load_fixture_suite(path, include_network=False)
         with_network = load_fixture_suite(path, include_network=True)
@@ -172,6 +174,12 @@ def run_doctor(
         )
 
     checks.append(_python_check())
+    has_plugin = getattr(ctx, "has_plugin", None)
+    if callable(has_plugin):
+        conflicts = [name for name in ("jev-router", "jev-compaction-plus") if has_plugin(name)]
+        checks.append(_check("other_jev_plugins", "warn" if conflicts else "pass",
+                             "review overlapping plugins: " + ", ".join(conflicts) if conflicts
+                             else "no known overlapping Jev plugins enabled"))
     compaction = read_compaction_config(ctx)
     engine_surface = callable(getattr(ctx, "register_context_engine", None))
     checks.append(_check(

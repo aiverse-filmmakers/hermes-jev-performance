@@ -6,18 +6,12 @@ The host dashboard auth gate runs before these routes.
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-if str(PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_ROOT))
-
-from jevperf.dashboard_service import (  # noqa: E402
+from .dashboard_service import (
     analytics_payload,
     benchmark_export_payload,
     benchmark_runs_payload,
@@ -32,14 +26,25 @@ from jevperf.dashboard_service import (  # noqa: E402
 router = APIRouter()
 
 
+def _mode_body(body: Any) -> str:
+    if not isinstance(body, dict) or set(body) != {"mode"}:
+        raise HTTPException(status_code=422, detail="Expected exactly one field: mode")
+    mode = body["mode"]
+    if not isinstance(mode, str) or mode not in {"off", "shadow", "on"}:
+        raise HTTPException(status_code=422, detail="mode must be one of: off, shadow, on")
+    return mode
+
+
 @router.put("/compaction")
 async def put_compaction_mode(payload: dict[str, Any], profile: str | None = Query(default=None)) -> dict[str, Any]:
     _ensure_profile_scope(profile)
-    mode = payload.get("mode") if isinstance(payload, dict) else None
-    if mode not in {"off", "shadow", "on"}:
-        raise HTTPException(status_code=400, detail="mode must be one of: off, shadow, on")
+    mode = _mode_body(payload)
     try:
         return set_dashboard_compaction_mode(mode)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Compaction mode is administrator-managed")
+    except RuntimeError:
+        raise HTTPException(status_code=409, detail="Compaction mode write could not be verified")
     except Exception:
         raise HTTPException(status_code=503, detail="Compaction settings unavailable")
 
@@ -159,12 +164,7 @@ async def update_mode(
     profile: str | None = Query(default=None),
 ) -> dict[str, Any]:
     _ensure_profile_scope(profile)
-    if set(body) != {"mode"}:
-        raise HTTPException(status_code=422, detail="Expected exactly one field: mode")
-
-    mode = body.get("mode")
-    if not isinstance(mode, str):
-        raise HTTPException(status_code=422, detail="mode must be a string")
+    mode = _mode_body(body)
 
     try:
         return set_dashboard_mode(mode)

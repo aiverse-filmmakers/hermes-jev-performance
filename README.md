@@ -1,5 +1,7 @@
 # Jev Performance for Hermes
 
+**Alpha test candidate.** Repository and offline Hermes contracts are checked; actual Desktop/VPS installation and appearance still need verification. See [current status](docs/STATUS.md).
+
 **Install Jev where Hermes runs. Add the visual dashboard only on the computer where you use Hermes Desktop.** The same official GitHub repository provides three setups:
 
 | Your setup | What to install |
@@ -28,7 +30,13 @@ Jev can help Hermes choose relevant tool families and can optionally compact old
 
 ## Downloadable packages
 
-Separate Server only, Desktop dashboard, and combined ZIPs with file lists and checksums are built and verified during development. They are not published as a GitHub release yet. For now, use the official install links above; Hermes will show the source and its normal security prompt before installing.
+The [alpha test release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.9) provides three packages:
+
+- [Server only for your VPS/backend](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.9/hermes-jev-performance-server-only-0.1.0-alpha.9.zip)
+- [Desktop dashboard for your computer](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.9/hermes-jev-performance-desktop-dashboard-0.1.0-alpha.9.zip)
+- [Both components for a local computer](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.9/hermes-jev-performance-combined-local-0.1.0-alpha.9.zip)
+
+Each ZIP contains one `hermes-jev-performance` folder, its instructions, and license. The release includes file inventories and SHA-256 checksums. Start with the guide for your setup; the native install links above let Hermes download the correct component directly.
 
 ## Help and compatibility
 

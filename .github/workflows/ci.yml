@@ -36,6 +36,10 @@ jobs:
         run: node --check desktop/plugin.js && node --check dashboard/dist/index.js && node --check agent/dashboard/server-only.js
       - name: Public repository scan
         run: python scripts/public_repo_scan.py .
+      - name: Shared manifest consistency
+        run: python scripts/sync_manifests.py --check
+      - name: Desktop behavior and connection isolation
+        run: node --experimental-vm-modules --test tests/desktop.test.cjs
       - name: Build and verify install packages
         run: python scripts/build_release.py --output ${{ runner.temp }}/jevperf-release
       - name: Unit tests

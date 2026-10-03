@@ -1,13 +1,11 @@
-"""Compatibility entry point for Hermes' plugin API loader."""
-
-from __future__ import annotations
-
+"""Hermes API adapter for the canonical, package-isolated backend."""
 from pathlib import Path
-import sys
+import importlib.util
 
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-if str(PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_ROOT))
-
-from jevperf.plugin_api import router  # noqa: E402
+runtime_root = Path(__file__).resolve().parents[1] / "jevperf"
+spec = importlib.util.spec_from_file_location("jev_api_loader", runtime_root / "api_loader.py")
+if spec is None or spec.loader is None:
+    raise ImportError("Jev API loader is unavailable")
+loader = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(loader)
+router = loader.load_router(runtime_root)

@@ -3,7 +3,7 @@
   "label": "Jev Performance",
   "description": "Jev routing performance, cost, confidence, and Hermes turn metrics.",
   "icon": "Activity",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "tab": {
     "path": "/jev-performance",
     "position": "after:analytics"

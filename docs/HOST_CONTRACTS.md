@@ -4,7 +4,7 @@ This records source evidence used during the installation split. Source inspecti
 
 ## Inspected runtime
 
-- Hermes Agent: `v0.21.5+5279.g4e74031` (2026.9.24), Python 3.14.7.
+- Hermes Agent source: `v0.21.5+5279.g4e74031` (2026.9.24). The correction's offline host contracts use the available Hermes Python 3.11 runtime; this is separate from the previously observed runtime version.
 - Hermes source revision: `4e7403130ee278bd99c450fcd9f73c6b32135c95` in the local development checkout. This is evidence only; community installs do not need that checkout.
 - Hermes Desktop source package version `0.17.0` supports the APIs used here. A running Desktop app reported client `0.17.0` and backend `0.21.5`; this was a version observation only, not a plugin installation test.
 - Starting Jev plugin revision: `47b61fa6592b4657858f4d3807e14f21d6b78174`.
@@ -22,10 +22,10 @@ This records source evidence used during the installation split. Source inspecti
 | Server-only install link | The `/agent` subdirectory contains `plugin.yaml` and `__init__.py`, and no sibling Desktop entry inside that selected source. | Source-confirmed against plugin-detection contract; actual selected install not run. |
 | Combined package | Hermes detects the root Agent manifest and nested `desktop/plugin.js`; the install dialog can install the agent to the selected gateway and the Desktop files to this computer. | Source-confirmed; lifecycle test pending. |
 | Remote Desktop connection | Desktop SDK `ctx.rest` calls the plugin namespace using the active gateway connection. The Desktop app handles gateway auth. | Documented/source-confirmed; live remote integration pending. |
-| Agent API mount | Hermes finds `dashboard/manifest.json` under enabled agent plugins, validates the relative `api` path, imports `plugin_api.py`, and mounts the router under `/api/plugins/<name>`. | Source-confirmed; package integration test pending. |
+| Agent API mount | Hermes finds the manifest/API and mounts the delivered router under `/api/plugins/<name>`. Actual host tests verify authenticated health, unauthenticated 401, disabled-plugin 404, and strict mode bodies. | Passed in an isolated offline host app; real remote transport remains pending. |
 | Missing browser entry behavior | Hermes defaults a missing manifest `entry` to `dist/index.js`; its web loader injects a script for every manifest. | Source-confirmed: manifest omission alone is not API-only safe. |
 | Hidden browser tab | Manifest `tab.hidden` prevents a visible browser dashboard tab; the browser loader still needs a registration for the manifest. | Source-confirmed; server shim smoke test pending. |
-| Profile switches | The Desktop SDK request is associated with active plugin scope; host state exposes connection/profile. | Source-confirmed; stale response/write integration tests pending. |
+| Profile switches | `ctx.rest` uses the active gateway profile. The panel uses `host.state.profile` with `connectionId`, rather than the focused chat's profile. | Delivered-file behavior tests pass for delayed reads/read-back, write races, and cleanup; real app switches remain pending. |
 
 ## Deliberately unverified
 

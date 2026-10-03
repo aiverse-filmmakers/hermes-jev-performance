@@ -71,6 +71,8 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             help="Include the optional public-web read-only fixture.",
         )
         benchmark.add_argument("--timeout", type=float, default=180.0)
+        benchmark.add_argument("--fixtures", type=str, default=None,
+                               help="Optional reviewed benchmark fixture JSON path.")
         benchmark.add_argument(
             "--export",
             type=str,
@@ -123,13 +125,15 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
             repeats = int(getattr(args, "repeats", 3))
             warmups = int(getattr(args, "warmups", 1))
             include_network = bool(getattr(args, "include_network", False))
+            fixture_options = {"fixture_path": getattr(args, "fixtures")} if getattr(args, "fixtures", None) else {}
             try:
                 plan = benchmark_plan_summary(
                     repeats=repeats,
                     warmups=warmups,
                     include_network=include_network,
+                    **fixture_options,
                 )
-            except ValueError as exc:
+            except (ValueError, RuntimeError) as exc:
                 print(f"Benchmark configuration error: {exc}")
                 return 2
             if not bool(getattr(args, "live", False)):
@@ -152,6 +156,7 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
                     warmups=warmups,
                     include_network=include_network,
                     timeout_seconds=float(getattr(args, "timeout", 180.0)),
+                    **fixture_options,
                 )
             except (ValueError, RuntimeError) as exc:
                 print(f"Benchmark failed: {exc}")

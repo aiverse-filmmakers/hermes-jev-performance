@@ -1,91 +1,83 @@
-name: hermes-jev-performance
-version: 0.1.0-alpha.8
+name: "hermes-jev-performance"
+version: "0.1.0-alpha.9"
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
-description: Jev routing, recoverable compaction, and performance data API for Hermes.
-license: MIT
-homepage: https://github.com/aiverse-filmmakers/hermes-jev-performance
-tags: [jev, routing, compaction, observability, performance, openrouter]
-provides_middleware:
-  - llm_request
-provides_hooks:
-  - pre_api_request
-  - post_api_request
-  - post_tool_call
-  - on_session_end
-  - transform_llm_output
-
+description: "Jev routing, recoverable compaction, and performance data API for Hermes."
+license: "MIT"
+homepage: "https://github.com/aiverse-filmmakers/hermes-jev-performance"
+tags: ["jev", "routing", "compaction", "observability", "performance", "openrouter"]
+provides_hooks: ["pre_api_request", "post_api_request", "post_tool_call", "on_session_end", "transform_llm_output"]
 config_schema:
   mode:
-    type: str
-    default: off
+    type: "str"
+    default: "off"
     description: "Routing mode: off, shadow, or on."
   provider:
-    type: str
-    default: openrouter
+    type: "str"
+    default: "openrouter"
     description: "Jev provider identifier. v1 supports OpenRouter."
   model:
-    type: str
-    default: typesafe/jev-1.13
+    type: "str"
+    default: "typesafe/jev-1.13"
     description: "Jev model identifier used by the configured provider."
   min_confidence:
-    type: float
-    default: 0.70
+    type: "float"
+    default: 0.7
     description: "Minimum confidence required before an ON-mode route may be applied."
   timeout_seconds:
-    type: float
+    type: "float"
     default: 2.5
     description: "Maximum Jev decision request duration in seconds."
   notice:
-    type: bool
+    type: "bool"
     default: false
     description: "Whether replies may show a concise Jev routing notice."
   retention_days:
-    type: int
+    type: "int"
     default: 30
     description: "Local performance telemetry retention period in days."
   telemetry_enabled:
-    type: bool
+    type: "bool"
     default: true
     description: "Whether local metadata-only performance telemetry is enabled."
   compaction_mode:
-    type: str
-    default: off
+    type: "str"
+    default: "off"
     description: "Independent experimental compaction mode; requires native context engine selection. Global routing OFF suspends Jev calls."
   compaction_drop_confidence:
-    type: float
-    default: 0.90
+    type: "float"
+    default: 0.9
     description: "Minimum archive probability; uncertain output stays verbatim."
   compaction_min_drop_chars:
-    type: int
+    type: "int"
     default: 1500
     description: "Outputs below this size stay verbatim."
   compaction_preview_chars:
-    type: int
+    type: "int"
     default: 600
     description: "Combined head/tail preview size sent to Jev after redaction."
   compaction_preserve_recent_messages:
-    type: int
+    type: "int"
     default: 6
     description: "Minimum protected tail rows, expanded to a complete user exchange."
   compaction_max_state_tokens:
-    type: int
+    type: "int"
     default: 14000
     description: "Conservative estimated decision-state token budget."
   compaction_max_request_tokens:
-    type: int
+    type: "int"
     default: 30000
     description: "Conservative estimated full request token budget."
   compaction_min_reduction_ratio:
-    type: float
+    type: "float"
     default: 0.25
     description: "Minimum estimated reduction before replacing output with archive references."
   compaction_max_batches:
-    type: int
+    type: "int"
     default: 8
     description: "Maximum sequential decision batches per compaction."
   compaction_deadline_seconds:
-    type: float
+    type: "float"
     default: 10.0
     description: "Total bounded Jev decision budget per compaction attempt."

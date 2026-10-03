@@ -47,7 +47,7 @@ def load_api_module():
 
     previous_fastapi = sys.modules.get("fastapi")
     sys.modules["fastapi"] = fake
-    name = "hermes_jev_dashboard_api_test"
+    name = "jevperf._api_contract_test"
     spec = importlib.util.spec_from_file_location(name, PLUGIN_API)
     module = importlib.util.module_from_spec(spec)
     previous_module = sys.modules.get(name)
@@ -80,6 +80,27 @@ def fake_hermes_profile_modules(*, exists=True, matches=True):
 
 
 class DashboardApiContractTests(unittest.TestCase):
+    def test_both_mode_routes_reject_malformed_and_unknown_fields_before_writing(self):
+        module = load_api_module()
+        for handler in (module.update_mode, module.put_compaction_mode):
+            for body in ({}, {"mode": "on", "extra": True}, {"mode": ["on"]},
+                         {"mode": None}, {"mode": True}, {"mode": "ON"},
+                         {"mode": "turbo"}, []):
+                with self.subTest(handler=handler.__name__, body=body):
+                    with self.assertRaises(FakeHTTPException) as caught:
+                        asyncio.run(handler(body))
+                    self.assertEqual(caught.exception.status_code, 422)
+
+    def test_compaction_permission_and_readback_errors_are_safe(self):
+        module = load_api_module()
+        for exception, expected in ((PermissionError, 403), (RuntimeError, 409)):
+            with mock.patch.object(module, "set_dashboard_compaction_mode",
+                                   side_effect=exception("PRIVATE_DETAIL")):
+                with self.assertRaises(FakeHTTPException) as caught:
+                    asyncio.run(module.put_compaction_mode({"mode": "on"}))
+                self.assertEqual(caught.exception.status_code, expected)
+                self.assertNotIn("PRIVATE_DETAIL", caught.exception.detail)
+
     def test_expected_routes_only(self):
         module = load_api_module()
         routes = {(method, path) for method, path, _ in module.router.routes}

@@ -1,11 +1,13 @@
-# Jev Performance for Hermes Desktop
+# Jev Performance — Desktop dashboard
 
-This is the local visual panel. Install it on the computer running Hermes Desktop. It reads data from the active Hermes connection, which may be your VPS; it does not need a local Hermes model.
+**Alpha test candidate.** The dashboard runs on the computer running Hermes Desktop. It reads the selected backend/profile, including an existing VPS connection. No local model is required. The matching Server component must be enabled on that backend.
 
-Start with the [easy Desktop install guide](../docs/INSTALL_DESKTOP_WITH_VPS.md). It opens the official Desktop-only install link. If that link does not open, the guide shows how to add the single `plugin.js` file through Hermes Desktop's **Open plugins folder** and **Rescan** buttons.
+Open the [Desktop install guide](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/docs/INSTALL_DESKTOP_WITH_VPS.md) for the official install link and setup checklist.
 
-If your chats use a VPS, keep that VPS connection selected. The panel runs on this computer and reads from the selected Hermes connection; it does not install files or a model on the VPS.
+For a Desktop ZIP from the [alpha release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.9): extract it, open Hermes Desktop **Settings → Plugins → Open plugins folder**, and move the extracted `hermes-jev-performance` folder there. `plugin.js` must sit directly inside it. Click **Rescan**, enable **Jev Performance**, then open its sidebar entry. Check the displayed connection/profile and Server version.
 
-The matching **Server only** component must be installed and enabled on the backend/profile you want to manage. The panel displays the selected connection/profile. Use the official repository installation guide for the exact tested app version and troubleshooting steps.
+To update manually, replace `plugin.js` from the official source and click **Rescan**. To disable, turn off its Desktop switch. To remove, disable first, then delete only its `hermes-jev-performance` folder from the opened Desktop plugins folder and click **Rescan**. The Server component and its data have their own lifecycle.
 
-The entry file uses Hermes' documented `@hermes/plugin-sdk` and React runtime exports. It is plain ESM and needs no build command.
+Routing and compaction begin Off on new Server installs. Configure Jev credentials securely on the backend. Shadow and On send provider requests and can incur charges. Compaction requires selecting the Jev context engine and restarting the backend agent.
+
+This plain ESM entry uses Hermes' public SDK; there is no user build step. See [compatibility and verification status](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/docs/STATUS.md) before treating it as a production release.

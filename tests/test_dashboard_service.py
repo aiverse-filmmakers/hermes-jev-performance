@@ -9,6 +9,7 @@ from jevperf.dashboard_service import (
     read_dashboard_config,
     health_payload,
     set_dashboard_mode,
+    set_dashboard_compaction_mode,
     status_payload,
     summary_payload,
 )
@@ -44,6 +45,39 @@ class SettingsHarness:
 
 
 class DashboardServiceTests(unittest.TestCase):
+    def test_health_permissions_engine_and_conflicts_come_from_host(self):
+        from unittest import mock
+        settings = SettingsHarness(mode="off", compaction_mode="off")
+        with mock.patch("jevperf.dashboard_service.resolve_openrouter_credential", return_value=None):
+            payload = health_payload(field_loader=settings.loader, host_loader=lambda: {
+                "context_engine": "another-engine", "routing_mode_write": False,
+                "compaction_mode_write": True, "conflicting_plugins": ["jev-router"]})
+        self.assertFalse(payload["capabilities"]["routing_mode_write"])
+        self.assertTrue(payload["capabilities"]["compaction_mode_write"])
+        self.assertIn("context_engine_not_selected", payload["setup_issues"])
+        self.assertIn("plugin_conflict", payload["setup_issues"])
+        self.assertEqual(payload["conflicting_plugins"], ["jev-router"])
+        self.assertTrue(payload["compaction_suspended"])
+        self.assertIsNone(payload["context_engine"]["active"])
+
+    def test_health_cannot_claim_write_support_when_host_probe_fails(self):
+        from unittest import mock
+        with mock.patch("jevperf.dashboard_service.resolve_openrouter_credential", return_value=None):
+            payload = health_payload(field_loader=SettingsHarness().loader,
+                                     host_loader=lambda: (_ for _ in ()).throw(RuntimeError("private")))
+        self.assertFalse(payload["capabilities"]["routing_mode_write"])
+        self.assertFalse(payload["capabilities"]["compaction_mode_write"])
+        self.assertNotIn("private", repr(payload))
+
+    def test_compaction_updates_read_back_saved_state(self):
+        settings = SettingsHarness(compaction_mode="off")
+        result = set_dashboard_compaction_mode("shadow", settings_writer=settings.writer,
+                                              field_loader=settings.loader)
+        self.assertEqual(result["mode"], "shadow")
+        with self.assertRaises(RuntimeError):
+            set_dashboard_compaction_mode("on", settings_writer=lambda *args: None,
+                                          field_loader=settings.loader)
+
     def make_store(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

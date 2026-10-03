@@ -122,3 +122,13 @@ ON-mode family filtering removes known competing eager tool schemas, but always 
 The repository provides a Server only package, a native Desktop dashboard package, and a combined local package. Fresh installs start with routing and compaction Off; upgrades retain saved user modes. The server package omits visual dashboard bundles and carries only the hidden entry needed by Hermes' browser dashboard loader to mount the authenticated API.
 
 **Why:** VPS users should install the agent where Hermes runs without copying unnecessary UI assets, while the local Hermes Desktop panel can manage the selected authenticated connection. One repository and plugin identity keep community setup and future updates understandable.
+
+## ADR-020 — Correct scoped Desktop requests and reproducible deliveries
+
+The Desktop panel follows the active gateway's `connectionId` and `profile`, matching `ctx.rest`. The focused chat's profile is a separate signal and cannot identify a settings request destination. A scoped controller guards reads, writes, read-back and cleanup, and uses bounded single-flight polling.
+
+Root and Server manifests are generated from `packaging/plugin-manifest.json`, with mode strings explicitly quoted for Hermes' YAML 1.1 parser. API adapters load canonical backend code in a path-specific package namespace without altering `sys.path`. Legacy configuration retains the same precedence as Hermes' `PluginContext`.
+
+ZIPs contain one `hermes-jev-performance` folder and fixed file metadata. Component instructions and document links are checked during packaging. Optional benchmark fixtures remain developer resources and are not required by the doctor. The Server package retains only the hidden 73-byte browser registration required by the host's loader.
+
+Offline native loader/auth/migration and delivered-JavaScript regression tests supplement unit checks. Actual Desktop/VPS installs and provider verification remain explicit release gates; alpha deliveries must disclose those gaps.

@@ -32,6 +32,12 @@ DEFAULT_FIXTURE_PATH = PLUGIN_ROOT / "benchmarks" / "fixtures" / "readonly_local
 _VERSION_RE = re.compile(r"Hermes Agent v([A-Za-z0-9.+_-]+)")
 
 
+def _benchmark_fixtures(path: Path | str, *, include_network: bool):
+    if not Path(path).is_file():
+        raise RuntimeError("Optional benchmark fixtures are not installed. Download the official reviewed suite and use --fixtures PATH; normal routing and compaction do not need it.")
+    return load_fixture_suite(path, include_network=include_network)
+
+
 def detect_hermes_version(executable: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -135,7 +141,7 @@ def run_live_benchmark(
             "controlled benchmark requires an OpenRouter Jev credential before any live turns run"
         )
 
-    fixtures = load_fixture_suite(
+    fixtures = _benchmark_fixtures(
         fixture_path,
         include_network=include_network,
     )
@@ -265,7 +271,7 @@ def benchmark_plan_summary(
     include_network: bool = False,
     fixture_path: Path | str = DEFAULT_FIXTURE_PATH,
 ) -> dict[str, Any]:
-    fixtures = load_fixture_suite(fixture_path, include_network=include_network)
+    fixtures = _benchmark_fixtures(fixture_path, include_network=include_network)
     plan = build_plan(fixtures, repeats=repeats, warmups=warmups, run_id="preview")
     return {
         "fixtures": [fixture.fixture_id for fixture in fixtures],

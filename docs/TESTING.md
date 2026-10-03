@@ -241,3 +241,28 @@ Default execution is read-only on the active profile.
 `--live-jev` adds one explicit provider call. `--active-agent` adds real OFF/SHADOW/ON Hermes turns and restores the original mode.
 
 The remaining Telegram and dashboard UI confirmations stay manual and must not be inferred from headless CI.
+
+## Installation split correction checks
+
+The `0.1.0-alpha.9` correction adds regression checks for actual REST/display profile agreement, delayed response/write read-back, unload cleanup, immutable package layout, archive persistence, strict API bodies, semantic manifest defaults, document links, and reproducible ZIPs.
+
+Repository checks:
+
+```sh
+PYTHONPATH=agent python3 -m unittest discover -s tests -q
+node --experimental-vm-modules --test tests/desktop.test.cjs
+python3 scripts/sync_manifests.py --check
+python3 scripts/build_release.py --output <TEMP_RELEASE_FOLDER>
+python3 scripts/public_repo_scan.py .
+```
+
+Offline native checks, using the dependency runtime belonging to the inspected Hermes source (no installer is invoked):
+
+```sh
+<HERMES_PYTHON> scripts/verify_host_contracts.py --hermes-source <HERMES_SOURCE>
+<HERMES_PYTHON> scripts/verify_native_compaction.py --hermes-source <HERMES_SOURCE>
+```
+
+Correction results: **240 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests, and 6 native compaction tests**. Ruff 0.15.20 correctness checks (`E9,F`) also pass. The inspected host contracts use Hermes Agent source revision recorded in [HOST_CONTRACTS.md](HOST_CONTRACTS.md), with Python 3.11.16. JavaScript checks use Node 24.7.0 locally; CI uses Node 22.
+
+The native loader test uses temporary extracted packages and synthetic profile data. It loads/unloads/reloads through the actual host manager and preserves saved modes, metrics, exact archived output, and an unrelated plugin. Its API test uses Hermes' actual mount/auth middleware and real FastAPI validation. These tests do not install into a real profile, exercise Git update provenance, prove actual Desktop reconciliation, or replace remote/VPS and visual app gates.

@@ -14,6 +14,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DoctorTests(unittest.TestCase):
+    def test_missing_optional_benchmark_suite_is_not_a_runtime_failure(self):
+        from jevperf.doctor import _fixture_check
+        check = _fixture_check(Path('/synthetic-not-present/readonly_local.json'))
+        self.assertEqual(check.status, 'pass')
+        self.assertIn('optional', check.detail)
+
+    def test_overlapping_jev_plugins_are_reported_without_modification(self):
+        ctx = FakeContext()
+        ctx.has_plugin = lambda name: name == 'jev-router'
+        report = run_doctor(ctx, plugin_root=ROOT, db_path=self.make_db_path(), secret_reader=lambda name: '')
+        check = next(row for row in report['checks'] if row['name'] == 'other_jev_plugins')
+        self.assertEqual(check['status'], 'warn')
+        self.assertIn('jev-router', check['detail'])
+
     def make_db_path(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

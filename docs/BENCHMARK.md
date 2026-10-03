@@ -85,6 +85,8 @@ Warm-up samples are stored for auditability but excluded from comparison deltas.
 
 ## Local fixtures
 
+Install packages omit benchmark workload fixtures. They are optional developer resources, available as the reviewed [fixture JSON](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/benchmarks/fixtures/readonly_local.json). Save it separately on the backend only if you intend to run a benchmark, then preview with `hermes jev benchmark --fixtures <PATH>`. Add `--live` deliberately for paid provider turns. The plugin doctor and normal optimization do not require this file.
+
 Default read-only fixtures cover:
 
 - `none`: simple no-tool control;

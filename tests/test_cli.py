@@ -37,6 +37,12 @@ class FakeTelemetry:
 
 
 class CliTests(unittest.TestCase):
+    def test_missing_optional_benchmark_suite_gives_actionable_preview_error(self):
+        code, output, _, _ = self.parse_and_run(['benchmark', '--fixtures', '/synthetic-not-present/suite.json'])
+        self.assertEqual(code, 2)
+        self.assertIn('--fixtures PATH', output)
+        self.assertIn('not installed', output)
+
     def parse_and_run(self, argv, ctx=None, telemetry=None):
         ctx = ctx or FakeContext()
         telemetry = telemetry or FakeTelemetry()

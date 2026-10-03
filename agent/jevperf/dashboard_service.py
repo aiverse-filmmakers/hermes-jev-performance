@@ -42,9 +42,15 @@ class _MappingContext:
 
 
 def _settings_values(field_loader: Callable[..., Any] | None = None) -> dict[str, Any]:
+    legacy: Mapping[str, Any] = {}
+    saved: Mapping[str, Any] = {}
     if field_loader is None:
+        from hermes_cli.config import load_config_readonly
         from hermes_cli.plugins_settings import plugin_settings_fields
         field_loader = plugin_settings_fields
+        entry = (((load_config_readonly() or {}).get("plugins") or {}).get("entries") or {}).get(PLUGIN_ID) or {}
+        legacy = entry.get("config") if isinstance(entry.get("config"), Mapping) else {}
+        saved = entry.get("settings") if isinstance(entry.get("settings"), Mapping) else {}
 
     fields = field_loader(PLUGIN_ID, PLUGIN_ROOT)
     values: dict[str, Any] = {}
@@ -58,6 +64,10 @@ def _settings_values(field_loader: Callable[..., Any] | None = None) -> dict[str
             values[key] = field.get("value")
         elif "default" in field:
             values[key] = field.get("default")
+    # Mirror PluginContext.get_config: saved settings override legacy config,
+    # while schema defaults never overwrite an existing user's legacy modes.
+    values.update(legacy)
+    values.update(saved)
     return values
 
 
@@ -170,28 +180,55 @@ def status_payload(
     }
 
 
-def health_payload(*, field_loader: Callable[..., Any] | None = None) -> dict[str, Any]:
+def _host_readiness() -> dict[str, Any]:
+    """Read public host settings without changing config or calling a provider."""
+    from hermes_cli.config import is_managed, load_config_readonly
+    from hermes_cli.plugins_settings import save_plugin_settings
+    from hermes_cli import managed_scope
+
+    host_config = load_config_readonly() or {}
+    plugins = host_config.get("plugins") or {}
+    enabled = plugins.get("enabled") or []
+    disabled = plugins.get("disabled") or []
+    conflicts = [name for name in ("jev-router", "jev-compaction-plus")
+                 if name in enabled and name not in disabled]
+    writable = callable(save_plugin_settings) and not is_managed()
+    return {
+        "context_engine": (host_config.get("context") or {}).get("engine"),
+        "routing_mode_write": writable and not managed_scope.is_key_managed(
+            f"plugins.entries.{PLUGIN_ID}.settings.mode"),
+        "compaction_mode_write": writable and not managed_scope.is_key_managed(
+            f"plugins.entries.{PLUGIN_ID}.settings.compaction_mode"),
+        "conflicting_plugins": conflicts,
+    }
+
+
+def health_payload(*, field_loader: Callable[..., Any] | None = None,
+                   host_loader: Callable[..., Any] | None = None) -> dict[str, Any]:
     """Return setup readiness only; never return a credential or transcript data."""
     config = read_dashboard_config(field_loader)
     compaction = read_compaction_config(_MappingContext(_settings_values(field_loader)))
     credential_present = resolve_openrouter_credential() is not None
     try:
-        from hermes_cli.config import load_config_readonly
-
-        host_config = load_config_readonly() or {}
-        configured_engine = (host_config.get("context") or {}).get("engine")
+        readiness = (host_loader or _host_readiness)()
+        configured_engine = readiness.get("context_engine")
         if not isinstance(configured_engine, str) or not configured_engine.strip():
             configured_engine = None
         else:
             configured_engine = configured_engine.strip()
     except Exception:
+        readiness = {}
         configured_engine = None
 
     issues: list[str] = []
     if not credential_present:
         issues.append("credential_missing")
-    if compaction.mode != "off" and configured_engine != "hermes-jev-performance":
+    if configured_engine != "hermes-jev-performance":
         issues.append("context_engine_not_selected")
+    if not all(readiness.get(key) is True for key in ("routing_mode_write", "compaction_mode_write")):
+        issues.append("settings_read_only")
+    if readiness.get("conflicting_plugins"):
+        issues.append("plugin_conflict")
     return {
         "plugin_id": PLUGIN_ID,
         "backend_version": __version__,
@@ -205,11 +242,13 @@ def health_payload(*, field_loader: Callable[..., Any] | None = None) -> dict[st
             "restart_required": None,
         },
         "capabilities": {
-            "routing_mode_write": True,
-            "compaction_mode_write": True,
+            "routing_mode_write": readiness.get("routing_mode_write") is True,
+            "compaction_mode_write": readiness.get("compaction_mode_write") is True,
             "context_engine_setup": False,
         },
         "setup_issues": issues,
+        "conflicting_plugins": readiness.get("conflicting_plugins", []),
+        "compaction_suspended": config.mode == "off",
     }
 
 

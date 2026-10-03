@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 from pathlib import Path
 import socket
@@ -24,6 +25,13 @@ def main():
     sys.path.append(str(repository_root))
     sys.path.append(str(repository_root / "agent"))
     sys.dont_write_bytecode = True
+    # Hermes also has a tests package. Load this suite's package explicitly
+    # without placing the plugin's generic agent directory ahead of Hermes.
+    spec = importlib.util.spec_from_file_location("tests", repository_root / "tests/__init__.py",
+                                                 submodule_search_locations=[str(repository_root / "tests")])
+    package = importlib.util.module_from_spec(spec)
+    sys.modules["tests"] = package
+    spec.loader.exec_module(package)
     with tempfile.TemporaryDirectory() as temp, mock.patch.dict(os.environ, {
             "HERMES_HOME": str(Path(temp).resolve()), "HERMES_DISABLE_LAZY_INSTALLS": "1"}):
         # Never read the real profile or run real provider calls.

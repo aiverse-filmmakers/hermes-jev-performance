@@ -1,6 +1,6 @@
 # Jev Performance — Server only
 
-This is the backend component for Hermes. Install it on the machine where the intended Hermes backend runs, including your VPS. It contains no visual dashboard bundle.
+**Alpha test candidate.** This is the backend component for Hermes. Install it on the machine where the intended Hermes backend runs, including your VPS. It contains no visual dashboard bundle. See the [verification status](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/docs/STATUS.md) for outstanding real Desktop/VPS checks.
 
 For beginner instructions, see [Install Server only](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/docs/INSTALL_SERVER.md). Select the right Hermes backend/profile, open this component's install link in Hermes Desktop, confirm the target shown by Hermes, and run `/jev doctor` after installation. You may also ask Hermes in plain language; the copyable request is on the [repository's main page](https://github.com/aiverse-filmmakers/hermes-jev-performance).
 

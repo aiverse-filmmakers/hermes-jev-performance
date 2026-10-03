@@ -46,6 +46,8 @@ Those are not the same metric and must never be conflated.
 - Optional per-reply Jev notice.
 - Local metrics storage.
 - Native Hermes web dashboard tab.
+- Separately installable native Hermes Desktop dashboard using the selected authenticated backend/profile.
+- Server only on a VPS, Desktop only on the user's computer, or both components on a local computer, from this one repository.
 - Telegram/gateway status and control commands.
 - Jev latency, confidence, cost, provider/model, route and error/skipped reason.
 - Hermes turn duration, LLM request count, tool-call count, token metrics when Hermes exposes them reliably.
@@ -82,6 +84,8 @@ These may become later modules only through an ADR and separate milestone.
 - [`UPSTREAMS.md`](UPSTREAMS.md): upstream repositories, inspected snapshots and reuse plan.
 - [`DECISIONS.md`](DECISIONS.md): architecture decision records.
 - [`STATUS.md`](STATUS.md): live implementation status.
+- [`API.md`](API.md): versioned authenticated backend API and safe error contract.
+- [`INSTALLATION_PROGRESS.md`](INSTALLATION_PROGRESS.md): component delivery evidence and remaining live verification.
 
 ## 5. Definition of done for v1
 
@@ -95,6 +99,7 @@ v1 is done only when all of the following are true:
 - Telegram/gateway `/jev` control works.
 - A Jev failure does not break a Hermes turn.
 - Dashboard loads as a Hermes dashboard plugin.
+- Native Desktop panel loads, follows the actual REST connection/profile, and rejects stale responses after switches.
 - Dashboard can switch modes through authenticated/local Hermes dashboard APIs.
 - Metrics contain no prompt/tool payloads by default.
 - Baseline mode collects Hermes metrics without Jev calls.
