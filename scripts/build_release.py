@@ -48,6 +48,7 @@ def _files_for(kind: str) -> list[tuple[Path, str]]:
         if kind == "combined":
             paths = [(source, target) for source, target in paths if target != "README.md"]
             add("README.md")
+            add("CHANGELOG.md")
             for guide in sorted((ROOT / "docs").glob("*.md")):
                 add(guide.relative_to(ROOT).as_posix())
             add("desktop/plugin.js")
