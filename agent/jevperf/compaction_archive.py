@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import time
 import uuid
 
 from .store import PLUGIN_DATA_DIR, current_hermes_home
@@ -69,7 +70,14 @@ class OutputArchive:
                     raise ValueError("unsafe_archive_permissions")
         return path
 
-    def write_batch(self, entries: list[tuple[str, str]], *, should_abort=None) -> None:
+    @staticmethod
+    def _check_attempt(should_abort=None, deadline=None):
+        if should_abort is not None and should_abort():
+            raise InterruptedError("stale_compaction")
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError("archive_deadline")
+
+    def write_batch(self, entries: list[tuple[str, str]], *, should_abort=None, deadline=None) -> None:
         import fcntl
 
         # Validate the entire batch before creating any content.
@@ -86,15 +94,24 @@ class OutputArchive:
                 raise ValueError("duplicate_archive_directory")
             folders.add(directory)
             prepared.append((reference, raw, directory, name, len(text)))
+        self._check_attempt(should_abort, deadline)
         self._directory(create=True)
         fd = os.open(self.root / "LOCK", os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
         with os.fdopen(fd, "rb") as lock:
             info = os.fstat(lock.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
                 raise ValueError("unsafe_archive_lock")
-            fcntl.flock(lock, fcntl.LOCK_EX)
+            while True:
+                self._check_attempt(should_abort, deadline)
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    remaining = max(0, deadline - time.monotonic()) if deadline is not None else 0.01
+                    time.sleep(min(0.01, remaining))
             used = 0
             for folder, dirs, files in os.walk(self.root, followlinks=False):
+                self._check_attempt(should_abort, deadline)
                 self._directory(str(Path(folder).relative_to(self.root)) if Path(folder) != self.root else "")
                 if any((Path(folder) / d).is_symlink() for d in dirs):
                     raise ValueError("unsafe_archive_directory")
@@ -110,8 +127,7 @@ class OutputArchive:
             created = []
             try:
                 for reference, raw, directory, name, characters in prepared:
-                    if should_abort is not None and should_abort():
-                        raise InterruptedError("stale_compaction")
+                    self._check_attempt(should_abort, deadline)
                     owner = self._directory(directory.split("/")[0], create=True)
                     folder = owner / directory.split("/")[1]
                     folder.mkdir(mode=0o700)  # Refuse existing archives without touching them.
@@ -126,8 +142,7 @@ class OutputArchive:
                         os.fsync(stream.fileno())
                     self._write_index(folder, {"reference": reference, "characters": characters,
                                               "sha256": hashlib.sha256(raw).hexdigest()})
-                if should_abort is not None and should_abort():
-                    raise InterruptedError("stale_compaction")
+                self._check_attempt(should_abort, deadline)
             except BaseException:
                 # Ordinary partial-batch failures cannot leave raw orphan output.
                 for folder in reversed(created):
@@ -136,6 +151,37 @@ class OutputArchive:
                     folder.rmdir()
                     self._sync_directory(folder.parent)
                 raise
+
+    def discard_unpublished(self, references: list[str]) -> None:
+        """Roll back only this attempt's private references before host publication.
+
+        The caller owns these random, newly written references. Do not wait on
+        the profile write lock after cancellation: removal of these disjoint
+        leaves cannot alter another attempt's archive. A concurrent capacity
+        scan may conservatively fail open if it observes the removed leaves.
+        """
+        for reference in references:
+            if not isinstance(reference, str) or REFERENCE_RE.fullmatch(reference) is None:
+                raise ValueError("invalid_reference")
+            directory, name = reference.rsplit("/", 1)
+            folder = self._directory(directory)
+            index_path = folder / "INDEX.json"
+            fd = os.open(index_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, "rb") as stream:
+                info = os.fstat(stream.fileno())
+                if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                        or info.st_mode & 0o077 or info.st_size > 1024):
+                    raise ValueError("unsafe_archive_index")
+                if json.loads(stream.read(1024)).get("reference") != reference:
+                    raise ValueError("archive_integrity")
+            raw_path = folder / (name + ".txt")
+            info = raw_path.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise ValueError("unsafe_archive_file")
+            raw_path.unlink()
+            index_path.unlink()
+            folder.rmdir()
+            self._sync_directory(folder.parent)
 
     @staticmethod
     def _write_index(folder: Path, record: dict) -> None:

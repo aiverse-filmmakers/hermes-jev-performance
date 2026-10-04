@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.12 — 5 October 2026
+
+Closes the second Hermes audit's routing and compaction lifecycle regressions. Ambiguous shell credential concatenations and bare multiword secret assignments skip external transmission in routing and compaction, including Shadow. Polite/contextual follow-ups retain all tools. OFF revokes in-flight routes even across cache eviction and a return to ON.
+
+Recovery survives more than 64 confirmed session rotations. Cancelled provider responses retain known billing without updating the transcript or compression counters. Archive lock waiting honors cancellation and the remaining deadline; cancellation detected after a durable batch or at the final adapter fence removes new unpublished archives. Nonzero exit/return codes and stderr stay verbatim.
+
+279 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration contracts and 14 native compaction contracts pass. Native recovery is tested through 80 real Hermes SessionDB rotations. Client guides and all component versions now identify alpha.12. Complete-content relevance compaction remains available and opt-in. No paid provider call or client deployment was performed; live adoption and host commit limits remain documented.
+
 ## 0.1.0-alpha.11 — 4 October 2026
 
 Recoverable relevance compaction now supports unique older tool outputs. Jev assesses the complete redacted output in bounded chunks; every chunk must meet the archive threshold. Needed/uncertain parts and outputs that cannot be assessed completely stay. User/system constraints remain complete in decision state or the pass falls back. Head/tail previews and duplicate-only eligibility are no longer used.

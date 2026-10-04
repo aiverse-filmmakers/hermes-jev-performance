@@ -294,7 +294,7 @@ Routing and compaction remain OFF by default. All provider behavior above uses s
 
 ## Relevance compaction release
 
-The current release has 272 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests. It adds complete-content coverage, uncertain-part retention, chunk-boundary redaction, complete user constraints, partial assessment-budget handling and realistic research/file/media/publishing fixtures with critical middle facts. All native checks use the same reference/runtime recorded above. Old sections describe historical runs and do not define the current compaction policy.
+The alpha.11 release had 272 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests. It adds complete-content coverage, uncertain-part retention, chunk-boundary redaction, complete user constraints, partial assessment-budget handling and realistic research/file/media/publishing fixtures with critical middle facts. All native checks use the same reference/runtime recorded above. Old sections describe historical runs and do not define the current compaction policy.
 
 The current offline labelled replay uses a unique obsolete INFO log, not a retained duplicate. Estimated context is 34,922 → 6,031 tokens (82.7% reduction), with 2/2 critical facts retained and 1/1 exact paginated recovery. It uses two mocked assessment requests. Offline local duration is not Jev latency; provider costs/tokens remain unknown.
 
@@ -306,3 +306,22 @@ python3 scripts/verify_native_compaction.py --hermes-source <HERMES_SOURCE>
 ```
 
 For an explicitly chosen synthetic live provider trial on a securely configured backend, use `python3 scripts/benchmark_compaction.py --live`. No private client transcript is needed. Optional `--normal-hermes --baseline-model <MODEL>` adds a paid baseline summarizer call without changing profile settings. Compare recall, recovery, reported costs and duration; do not equate offline labelled tests with actual model accuracy. No provider credential was available in the development process for this pass, so no live provider result is claimed.
+
+## Second Hermes audit corrections
+
+Alpha.12 passes **279 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 14 native compaction tests**. Python 3.11–3.14 are covered by CI. Native checks use the same isolated Hermes source revision `7533bd2756b9526b52f527f737420a19e57331d7` and Python 3.11.16 runtime recorded above.
+
+The added regressions exercise credential concatenations and multiword client secrets in ON/SHADOW, compaction state/memory/output privacy, contextual follow-ups, concurrent OFF with LRU eviction, nonzero exit/return codes and stderr, a held archive lock with a 0.2-second budget, and cancellation immediately after durable batch write. Native tests recover a root archive through 80 actual SessionDB rotations, reject foreign forks, record cancelled response usage once and remove unpublished archives at the final adapter fence. A cancellation before any work records no paid attempt. Successful recovery does not depend on a tool-result carrier.
+
+```sh
+PYTHONPATH=agent python3 -m unittest tests.test_second_audit -v
+PYTHONPATH=agent python3 -m unittest discover -s tests -q
+node --experimental-vm-modules --test tests/desktop.test.cjs
+python3 scripts/verify_host_contracts.py --hermes-source <HERMES_SOURCE>
+python3 scripts/verify_native_compaction.py --hermes-source <HERMES_SOURCE>
+python3 scripts/sync_manifests.py --check
+python3 scripts/public_repo_scan.py .
+python3 scripts/build_release.py --output <OUTPUT_DIRECTORY>
+```
+
+These are synthetic/offline source checks, not approval of a serving deployment or proof of live Jev accuracy. Alpha.11's complete-content relevance benchmark remains applicable; alpha.10's duplicate-only description is historical. No production profile was installed or switched, and no paid provider call was made.

@@ -1,10 +1,10 @@
-# Client handoff — 0.1.0-alpha.11
+# Client handoff — 0.1.0-alpha.12
 
 Jev Performance is an independent MIT-licensed Hermes plugin delivered as an alpha for evaluation. It adds optional tool-family routing and performance telemetry, plus experimental recoverable compaction. It uses `typesafe/jev-1.13` through OpenRouter by default. Routing accuracy and net time/token savings have not yet been demonstrated in live client workflows.
 
 ## Delivery
 
-Use the [versioned alpha.11 release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.11). It contains three component ZIPs, `release-manifest.json`, per-package SHA-256 checksums and file inventories. Verify the downloaded ZIP against its checksum before installation. The tag identifies the exact delivered source; native one-click links instead follow the repository's current source.
+Use the [versioned alpha.12 release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.12). It contains three component ZIPs, `release-manifest.json`, per-package SHA-256 checksums and file inventories. Verify the downloaded ZIP against its checksum before installation. The tag identifies the exact delivered source; native one-click links instead follow the repository's current source.
 
 | Client setup | Package and instructions |
 |---|---|
@@ -17,13 +17,13 @@ Hermes Agent `>=0.21.5` is the declared minimum. Python 3.11–3.14 are tested i
 For an installer-managed Server evaluation pinned to this release, run on the intended backend in an isolated Hermes profile:
 
 ```sh
-hermes plugins install aiverse-filmmakers/hermes-jev-performance/agent --enable --ref v0.1.0-alpha.11
+hermes plugins install aiverse-filmmakers/hermes-jev-performance/agent --enable --ref v0.1.0-alpha.12
 hermes plugins doctor hermes-jev-performance --ci
 hermes jev doctor
 hermes jev status
 ```
 
-Use the repository root instead of `/agent` when installing the combined backend package. Verify the Desktop component separately through Hermes Desktop. Check that doctor reports version `0.1.0-alpha.11` and the intended profile before continuing.
+Use the repository root instead of `/agent` when installing the combined backend package. Verify the Desktop component separately through Hermes Desktop. Check that doctor reports version `0.1.0-alpha.12` and the intended profile before continuing.
 
 ## Evaluation
 
@@ -36,7 +36,7 @@ Use the repository root instead of `/agent` when installing the combined backend
 
 ## Evidence and limits
 
-272 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests passed with synthetic data and mocked provider responses. The native reference and commands are recorded in [TESTING.md](TESTING.md#relevance-compaction-release).
+279 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 14 native compaction tests passed with synthetic data and mocked provider responses. The native reference and commands are recorded in [TESTING.md](TESTING.md#second-hermes-audit-corrections).
 
 No paid provider trial or production installation was performed for this release. Rendered Desktop QA and live VPS workflows remain outstanding. Compaction archives and the host database are separate commits; a crash can leave unpublished archives. Arbitrary noncontiguous carried rows also retain a host recall integration limitation. These are documented alpha limits, not completed production checks.
 

@@ -1,6 +1,6 @@
 # Implementation and verification status
 
-**Version 0.1.0-alpha.11 is an alpha release for client evaluation. Production verification still requires the real Desktop/VPS checks below.** Official source: `aiverse-filmmakers/hermes-jev-performance`, branch `main`. Use the [client handoff](CLIENT_HANDOFF.md) for a repeatable versioned installation.
+**Version 0.1.0-alpha.12 is an alpha release for client evaluation. Production verification still requires the real Desktop/VPS checks below.** Official source: `aiverse-filmmakers/hermes-jev-performance`, branch `main`. Use the [client handoff](CLIENT_HANDOFF.md) for a repeatable versioned installation.
 
 ## Available components
 
@@ -17,9 +17,9 @@
 - Version/schema inputs, Python compilation, JavaScript syntax, public repository scan, document-link validation, and diff checks pass.
 - Builds contain one installable `hermes-jev-performance` folder. Check each release's `release-manifest.json`, inventory, and SHA-256 files for exact sizes and checksums. Source timestamps and permissions do not alter the ZIP bytes.
 
-For exact commands and test counts from the correction run, see [TESTING.md](TESTING.md#relevance-compaction-release).
+For exact commands and test counts from the correction run, see [TESTING.md](TESTING.md#second-hermes-audit-corrections).
 
-The `0.1.0-alpha.11` release includes the routing/privacy fixes and useful relevance compaction for unique older outputs. Jev sees complete redacted chunks; every chunk must pass before exact recoverable archival. See [COMPACTION.md](COMPACTION.md) for activation and [REVIEW_FIXES.md](REVIEW_FIXES.md) for limits. Modes start OFF, with separate external-data consent.
+The `0.1.0-alpha.12` release includes the routing/privacy fixes and useful relevance compaction for unique older outputs. Jev sees complete redacted chunks; every chunk must pass before exact recoverable archival. See [COMPACTION.md](COMPACTION.md) for activation and [REVIEW_FIXES.md](REVIEW_FIXES.md) for limits. Modes start OFF, with separate external-data consent.
 
 ## Still needs a real app or service
 

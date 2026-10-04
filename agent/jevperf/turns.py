@@ -25,7 +25,8 @@ _COMMON_TOKEN = re.compile(
     r"github_pat_[A-Za-z0-9_]{16,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b"
 )
 _URL_CREDENTIALS = re.compile(r"(?i)(https?://)[^\s/@]+:[^\s/@]+@")
-_FOLLOWUP = re.compile(r"(?i)^(?:(?:k|ok|okay|yes|sure)[,!. ]*)?(?:continue|proceed|finish|do it|go ahead|same|keep going)\b")
+_FOLLOWUP = re.compile(r"(?i)^(?:(?:k|ok|okay|yes|sure|please)[,!. ]*)*(?:continue|proceed|finish|do it|do the same|go ahead|same|keep going)\b")
+_CONTEXT_REFERENCE = re.compile(r"(?i)\b(?:last time|(?:discussed|agreed|mentioned) earlier|as before|previous (?:task|request|instructions))\b")
 
 
 def _content_text(content: Any) -> str:
@@ -97,11 +98,16 @@ def redact_routing_state(text: str) -> str:
 def safe_external_text(text: str) -> str | None:
     """Reject sensitive formats we cannot confidently redact; never a DLP guarantee."""
     for match in _SECRET_ASSIGNMENT.finditer(text):
-        # An unquoted multiword password has no trustworthy value boundary.
-        # Shell API-key assignments remain supported; quoted passwords are safe.
-        if (re.search(r"(?i)password|passwd|\bpwd\b", match.group(1)) and
-                not match.group(3).startswith(('"', "'")) and
-                re.match(r"[ \t]+[^\s,;}]", text[match.end():])):
+        value, suffix = match.group(3), text[match.end():]
+        # Shell concatenation does not end at a closing quote. A scalar regex
+        # cannot safely parse expansions/adjacent quoted or unquoted fragments.
+        if value.startswith(('"', "'")):
+            if suffix and not re.match(r"[\s,;}\]]", suffix):
+                return None
+        elif not value.startswith(("{", "[")) and (
+                suffix.startswith(('"', "'")) or re.match(r"[ \t]+[^\s,;}\]]", suffix)):
+            # This applies to every credential label, including client_secret
+            # and environment API keys. Require a quoted or explicit boundary.
             return None
     redacted = redact_routing_state(text)
     # Embedded structured assignments and malformed quotes cannot be safely
@@ -127,7 +133,7 @@ def extract_routing_state(request: Any) -> str | None:
     if not text or len(text) > MAX_ROUTING_STATE_CHARS:
         return None
     user_count = sum(isinstance(m, dict) and m.get("role") == "user" for m in items) if isinstance(items, list) else 1
-    if _FOLLOWUP.search(text) or (user_count > 1 and len(text.split()) <= 6):
+    if _FOLLOWUP.search(text) or _CONTEXT_REFERENCE.search(text) or (user_count > 1 and len(text.split()) <= 6):
         # Do not transmit history to guess what a short continuation means.
         return None
     text = safe_external_text(text)
@@ -158,6 +164,7 @@ class TurnDecisionCache:
         self.max_entries = max(1, int(max_entries))
         self._items: OrderedDict[str, Any] = OrderedDict()
         self._inflight: dict[str, threading.Lock] = {}
+        self._revoked: set[str] = set()
         self._lock = threading.Lock()
 
     def get(self, key: str) -> Any:
@@ -169,6 +176,9 @@ class TurnDecisionCache:
 
     def put(self, key: str, value: Any) -> None:
         with self._lock:
+            if value == (None, None) and key in self._inflight:
+                # Revocation must outlive LRU eviction until the worker returns.
+                self._revoked.add(key)
             self._put_locked(key, value)
 
     def _put_locked(self, key: str, value: Any) -> None:
@@ -198,6 +208,9 @@ class TurnDecisionCache:
                 with self._lock:
                     # A concurrent invalidation is authoritative over a slow
                     # classifier's response. Never revive the old restriction.
+                    if key in self._revoked:
+                        self._put_locked(key, (None, None))
+                        return (None, None)
                     existing = self._items.get(key)
                     if existing is not None:
                         self._items.move_to_end(key)
@@ -209,6 +222,7 @@ class TurnDecisionCache:
             with self._lock:
                 if self._inflight.get(key) is key_lock and not key_lock.locked():
                     self._inflight.pop(key, None)
+                    self._revoked.discard(key)
 
     def __len__(self) -> int:
         with self._lock:

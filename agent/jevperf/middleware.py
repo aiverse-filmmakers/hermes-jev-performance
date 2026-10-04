@@ -160,7 +160,7 @@ class RoutingMiddleware:
                 )
 
             if config.mode == "off":
-                if key is not None and self.cache.get(key) is not None:
+                if key is not None:
                     self.cache.put(key, (None, None))
                 self.last_decision = None
                 self.last_filter_reason = "mode_off"

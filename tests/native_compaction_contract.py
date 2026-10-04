@@ -72,7 +72,7 @@ class NativeCompactionContractTests(unittest.TestCase):
             self.engine.compress(transcript())
         normal.assert_called_once()
 
-    def test_recovery_requires_reference_in_actual_conversation(self):
+    def test_recovery_uses_session_ownership_without_transcript_carrier(self):
         out = self.engine.compress(transcript())
         ref = out[4]["content"].split(STUB_PREFIX, 1)[1].split(";", 1)[0]
         payload = json.loads(self.engine.handle_tool_call("jev_recover", {"reference": ref}, messages=out))
@@ -232,6 +232,87 @@ class NativeCompactionContractTests(unittest.TestCase):
         self.engine.bind_session_state(db, "unrelated-child")
         rejected = json.loads(self.engine.handle_tool_call("jev_recover", {"reference": ref}, messages=out))
         self.assertIn("error", rejected)
+
+    def test_recovery_survives_more_than_64_real_session_rotations(self):
+        from hermes_state import SessionDB
+        db = SessionDB(self.root / "long-lineage.db")
+        self.addCleanup(db.close)
+        db.create_session("synthetic-session", "cli")
+        out = self.engine.compress(transcript())
+        ref = out[4]["content"].split(STUB_PREFIX, 1)[1].split(";", 1)[0]
+        parent = "synthetic-session"
+        for i in range(80):
+            child = f"rotation-{i}"
+            db.end_session(parent, "compression")
+            db.create_session(child, "cli", parent_session_id=parent)
+            parent = child
+        self.engine.bind_session_state(db, parent)
+        recovered = json.loads(self.engine.handle_tool_call("jev_recover", {"reference": ref}, messages=[]))
+        self.assertEqual(recovered["text"], transcript()[4]["content"][:20000])
+        db.create_session("foreign-fork", "cli", parent_session_id="synthetic-session",
+                          model_config={"_branched_from": "synthetic-session"})
+        self.engine.bind_session_state(db, "foreign-fork")
+        self.assertIn("error", json.loads(self.engine.handle_tool_call("jev_recover", {"reference": ref})))
+
+    def test_cancelled_paid_response_records_usage_without_publishing_transcript(self):
+        self.ctx.settings["telemetry_enabled"] = True
+        cancelled = False
+        evaluator = Evaluator()
+        def cancel_response(**kwargs):
+            nonlocal cancelled
+            response = evaluator(**kwargs)
+            cancelled = True
+            return response
+        metrics = mock.Mock()
+        with mock.patch("hermes_cli.config.load_config_readonly", return_value={}):
+            engine = create_context_engine(self.ctx, compactor=compactor(cancel_response),
+                                           archive=self.archive, metrics_recorder=metrics)
+        engine.update_model(model="synthetic-model", context_length=100000)
+        engine.bind_session_state(session_id="synthetic-session")
+        engine._compression_cancelled_check = lambda: cancelled
+        rows = transcript()
+        with mock.patch.object(ContextCompressor, "compress", side_effect=AssertionError("stale fallback")):
+            self.assertIs(engine.compress(rows), rows)
+        metrics.assert_called_once()
+        metadata = metrics.call_args.args[0]
+        self.assertEqual(metadata["outcome"], "stale_attempt")
+        self.assertEqual(metadata["requests"], 1)
+        self.assertAlmostEqual(metadata["known_cost_usd"], 0.00001)
+        self.assertEqual(metadata["known_input_tokens"], 10)
+        self.assertIsNone(engine.jev_last_result)
+        self.assertEqual(engine.compression_count, 0)
+        self.assertFalse(self.archive.root.exists())
+
+    def test_final_adapter_cancellation_removes_unpublished_archive_and_keeps_billing(self):
+        self.ctx.settings["telemetry_enabled"] = True
+        cancelled = False
+        real = compactor()
+        def finish_then_cancel(*args, **kwargs):
+            nonlocal cancelled
+            result = real.compact(*args, **kwargs)
+            self.assertEqual(result.outcome, "applied")
+            cancelled = True
+            return result
+        metrics = mock.Mock()
+        with mock.patch("hermes_cli.config.load_config_readonly", return_value={}):
+            engine = create_context_engine(self.ctx, compactor=SimpleNamespace(compact=finish_then_cancel),
+                                           archive=self.archive, metrics_recorder=metrics)
+        engine.update_model(model="synthetic-model", context_length=100000)
+        engine.bind_session_state(session_id="synthetic-session")
+        engine._compression_cancelled_check = lambda: cancelled
+        rows = transcript()
+        with mock.patch.object(ContextCompressor, "compress", side_effect=AssertionError("stale fallback")):
+            self.assertIs(engine.compress(rows), rows)
+        self.assertEqual(list(self.archive.root.rglob("*.txt")), [])
+        self.assertEqual(list(self.archive.root.rglob("INDEX.json")), [])
+        self.assertIsNone(engine.jev_last_result)
+        self.assertEqual(engine.compression_count, 0)
+        metrics.assert_called_once()
+        metadata = metrics.call_args.args[0]
+        self.assertEqual(metadata["outcome"], "stale_attempt")
+        self.assertAlmostEqual(metadata["known_cost_usd"], 0.00001)
+        self.assertEqual(metadata["estimated_tokens_before"], metadata["estimated_tokens_after"])
+        self.assertNotIn("archive_references", metadata)
 
 
 if __name__ == "__main__":

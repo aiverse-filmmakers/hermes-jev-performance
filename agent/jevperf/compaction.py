@@ -76,10 +76,11 @@ class CompactionResult:
     known_cost_usd: float = 0.0
     known_input_tokens: int = 0
     known_output_tokens: int = 0
+    archive_references: list[str] = field(default_factory=list, repr=False)
     rulebook_version: str = RULEBOOK_VERSION
 
     def metadata(self) -> dict[str, Any]:
-        return {key: value for key, value in vars(self).items() if key != "messages"}
+        return {key: value for key, value in vars(self).items() if key not in {"messages", "archive_references"}}
 
 
 def _error_content(message: dict[str, Any]) -> bool:
@@ -95,6 +96,11 @@ def _error_content(message: dict[str, Any]) -> bool:
     def has_error(item: Any) -> bool:
         if isinstance(item, dict):
             if any(item.get(k) for k in ("error", "errors", "is_error")):
+                return True
+            if item.get("stderr"):
+                return True
+            if any(k in item and item[k] not in (0, "0", None) for k in
+                   ("exit_code", "exit_status", "returncode", "return_code")):
                 return True
             if item.get("success") is False or item.get("ok") is False or item.get("status") in ("error", "failed", "failure"):
                 return True
@@ -332,8 +338,15 @@ class JevCompactor:
                 return result
             # Complete all durable writes before publishing any transcript replacement.
             check_current()
-            archive.write_batch([(refs[c.index], c.content) for c in selected], should_abort=should_abort)
+            remaining = config.deadline_seconds - (self.clock() - started)
+            if remaining <= 0:
+                raise TimeoutError()
+            archive.write_batch([(refs[c.index], c.content) for c in selected], should_abort=should_abort,
+                                deadline=time.monotonic() + remaining)
+            result.archive_references = list(refs.values())
             check_current()
+            if self.clock() - started > config.deadline_seconds:
+                raise TimeoutError()
             result.messages = replaced
             result.outcome = "applied"
             return result
@@ -347,6 +360,15 @@ class JevCompactor:
             result.outcome = "fallback_error"
             return result
         finally:
+            if result.outcome != "applied" and result.archive_references:
+                try:
+                    archive.discard_unpublished(result.archive_references)
+                    result.archive_references.clear()
+                except (OSError, ValueError):
+                    # Preserve the result/known usage if the filesystem refuses
+                    # rollback. The adapter may retry; never publish these rows.
+                    result.outcome = "fallback_error"
+                result.estimated_tokens_after = before
             result.latency_ms = (self.clock() - started) * 1000
 
 
