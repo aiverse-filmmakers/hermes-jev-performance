@@ -13,9 +13,11 @@ from .store import default_db_path
 
 OUTCOMES = frozenset({"off", "no_candidates", "missing_credential", "archive_unavailable",
                       "keep_all", "insufficient_reduction", "still_over_budget", "shadow",
-                      "applied", "deadline", "fallback_error", "recovered", "recovery_error"})
+                      "applied", "deadline", "fallback_error", "recovered", "recovery_error",
+                      "external_not_approved", "stale_attempt"})
 NUMERIC_FIELDS = ("candidates", "selected", "requests", "estimated_tokens_before",
-                  "estimated_tokens_after", "latency_ms", "cost_usd", "input_tokens", "output_tokens")
+                  "estimated_tokens_after", "latency_ms", "cost_usd", "input_tokens", "output_tokens",
+                  "known_cost_usd", "known_input_tokens", "known_output_tokens")
 
 
 def metrics_path() -> Path:
@@ -42,7 +44,7 @@ def record_compaction(metadata: dict, path: Path | None = None) -> None:
 def compaction_summary(path: Path | None = None, hours: int = 24) -> dict:
     target = path or metrics_path()
     out = {"attempts": 0, "applied": 0, "shadow": 0, "fallback": 0, "retrievals": 0, "retrieval_failures": 0,
-           "estimated_tokens_saved": 0, "cost_usd": None, "avg_latency_ms": None}
+           "estimated_tokens_saved": 0, "cost_usd": None, "known_cost_usd": 0, "avg_latency_ms": None}
     if not target.exists():
         return out
     if target.is_symlink():
@@ -60,6 +62,7 @@ def compaction_summary(path: Path | None = None, hours: int = 24) -> dict:
     out["estimated_tokens_saved"] = sum(max(0, (r.get("estimated_tokens_before") or 0) -
                                               (r.get("estimated_tokens_after") or 0)) for r in rows if r["outcome"] == "applied")
     costs = [r["cost_usd"] for r in rows if r.get("requests", 0)]
+    out["known_cost_usd"] = sum(r.get("known_cost_usd") or 0 for r in rows)
     if costs and all(value is not None for value in costs):
         out["cost_usd"] = sum(costs)
     latencies = [r["latency_ms"] for r in rows if r.get("latency_ms") is not None]

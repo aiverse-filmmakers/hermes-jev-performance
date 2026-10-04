@@ -19,6 +19,8 @@
 
 For exact commands and test counts from the correction run, see [TESTING.md](TESTING.md#installation-split-correction-checks).
 
+The `0.1.0-alpha.10` source candidate additionally fixes the routing/privacy review defects and adds a separate external-data compaction gate. See [REVIEW_FIXES.md](REVIEW_FIXES.md) for behavior, evidence and remaining limits. Previous `0.1.0-alpha.9` release ZIPs do not contain those fixes. Keep compaction OFF during routing evaluation.
+
 ## Still needs a real app or service
 
 - Branded Hermes Desktop install dialogs and actual panel discovery/rendering, including light/dark appearance, narrow layout, keyboard navigation, and unload behavior.

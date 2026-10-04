@@ -1,5 +1,5 @@
 name: "hermes-jev-performance"
-version: "0.1.0-alpha.9"
+version: "0.1.0-alpha.10"
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
@@ -48,7 +48,7 @@ config_schema:
   compaction_drop_confidence:
     type: "float"
     default: 0.9
-    description: "Minimum archive probability; uncertain output stays verbatim."
+    description: "Minimum archive probability for outputs with a complete exact duplicate retained in context."
   compaction_min_drop_chars:
     type: "int"
     default: 1500
@@ -81,3 +81,7 @@ config_schema:
     type: "float"
     default: 10.0
     description: "Total bounded Jev decision budget per compaction attempt."
+  compaction_allow_external:
+    type: "bool"
+    default: false
+    description: "Separate opt-in for paid OpenRouter compaction calls sending redacted conversation/memory excerpts and tool previews, including SHADOW. Default blocks transmission."

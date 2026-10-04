@@ -35,7 +35,8 @@ def build_cli(ctx: Any, router_middleware: Any, telemetry: Any):
         sub.add_parser("shadow", help="Run Jev decisions without changing Hermes tools.")
         sub.add_parser("stats", help="Show local Jev/Hermes performance stats.")
         compaction = sub.add_parser("compaction", help="Configure experimental recoverable tool-output compaction.")
-        compaction.add_argument("state", nargs="?", default="status", choices=("status", "off", "shadow", "on"))
+        compaction.add_argument("state", nargs="?", default="status",
+                                choices=("status", "off", "shadow", "on", "allow-external", "deny-external"))
         probe = sub.add_parser("compaction-benchmark", help="Synthetic exact-recall and recovery probe; offline by default.")
         probe.add_argument("--live", action="store_true", help="Send only synthetic fixture data to OpenRouter Jev (paid).")
         sub.add_parser(

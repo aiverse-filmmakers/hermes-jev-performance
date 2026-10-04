@@ -9,11 +9,11 @@ from typing import Any
 from .config import read_config
 from .families import filter_tools
 from .routing import JevRouter, RoutingDecision
-from .turns import TurnDecisionCache, extract_routing_state, turn_key
+from .turns import TurnDecisionCache, decision_key, extract_routing_state, turn_key
 
 
 class RoutingMiddleware:
-    """One Jev decision per fresh turn, reused through the tool loop."""
+    """One Jev decision per fresh turn; changed inputs restore all tools."""
 
     def __init__(
         self,
@@ -25,7 +25,7 @@ class RoutingMiddleware:
     ) -> None:
         self.ctx = ctx
         self.router = router or JevRouter()
-        self.cache = cache or TurnDecisionCache()
+        self.cache = cache if cache is not None else TurnDecisionCache()
         self.telemetry = telemetry
         self.last_decision: RoutingDecision | None = None
         self.last_filter_reason: str | None = None
@@ -82,19 +82,34 @@ class RoutingMiddleware:
         key: str,
         config: Any,
     ) -> RoutingDecision | None:
-        def compute() -> RoutingDecision | None:
-            state = extract_routing_state(request)
-            if not state:
-                return None
-            return self.router.decide(
-                state,
-                provider=config.provider,
-                model=config.model,
-                timeout_seconds=config.timeout_seconds,
-                min_confidence=config.min_confidence,
-            )
+        state = extract_routing_state(request)
+        if not state:
+            # Once this turn becomes unusable, an older request must not revive
+            # its restriction if the host later presents a truncated transcript.
+            self.cache.put(key, (None, None))
+            return None
+        fingerprint = decision_key(key, state, config)
 
-        decision = self.cache.get_or_compute(key, compute)
+        def compute():
+            try:
+                decision = self.router.decide(
+                    state,
+                    provider=config.provider,
+                    model=config.model,
+                    timeout_seconds=config.timeout_seconds,
+                    min_confidence=config.min_confidence,
+                )
+            except Exception:
+                self.cache.put(key, (None, None))
+                raise
+            return fingerprint, decision
+
+        cached_fingerprint, decision = self.cache.get_or_compute(key, compute)
+        if cached_fingerprint != fingerprint:
+            # Changed state/config fails open for the rest of this turn. No
+            # extra paid decisions (or untracked same-turn provider charges).
+            self.cache.put(key, (None, None))
+            return None
         return decision if isinstance(decision, RoutingDecision) else None
 
     def _record(
@@ -145,6 +160,8 @@ class RoutingMiddleware:
                 )
 
             if config.mode == "off":
+                if key is not None and self.cache.get(key) is not None:
+                    self.cache.put(key, (None, None))
                 self.last_decision = None
                 self.last_filter_reason = "mode_off"
                 self._remember_session(session_id, None, mode=config.mode, reason="mode_off")
@@ -159,6 +176,15 @@ class RoutingMiddleware:
 
             if key is None:
                 self.last_filter_reason = "missing_turn_id"
+                return None
+
+            # Named/required/unknown provider choices are authoritative. Bypass
+            # routing entirely so filtering cannot invalidate a forced request.
+            if request.get("tool_choice") not in (None, "auto"):
+                self.cache.put(key, (None, None))
+                self.last_decision = None
+                self.last_filter_reason = "explicit_tool_choice"
+                self._remember_session(session_id, None, mode=config.mode, reason=self.last_filter_reason)
                 return None
 
             decision = self._decision_for_turn(

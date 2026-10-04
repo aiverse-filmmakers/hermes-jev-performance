@@ -33,7 +33,7 @@ def register_plugin(ctx: Any) -> None:
         "jev",
         build_command_handler(ctx, router_middleware, telemetry),
         description="Jev routing/performance status and controls.",
-        args_hint="[status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|notice on|notice off|help]",
+        args_hint="[status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|compaction allow-external|compaction deny-external|notice on|notice off|help]",
     )
 
     register_middleware = getattr(ctx, "register_middleware", None)

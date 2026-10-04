@@ -26,11 +26,13 @@ Jev can help Hermes choose relevant tool families and can optionally compact old
 2. Run `/jev doctor` in a chat connected to the backend where the Server component was installed.
 3. Add the Jev/OpenRouter credential using that backend's secure credential settings. Never paste it into chat or the dashboard.
 4. Choose Shadow only when you are ready for provider requests and possible charges. Review the results before choosing On.
-5. To use recoverable compaction, select `hermes-jev-performance` as the Hermes context engine in the same profile and restart its agent. Start compaction in Shadow.
+5. Keep compaction OFF during routing evaluation. Experimental compaction requires native engine selection and a separate external-data opt-in; see [review fixes and remaining gates](docs/REVIEW_FIXES.md). Compaction Shadow can send redacted history, memory excerpts and tool previews to OpenRouter, unlike routing's latest-user-only state.
 
 ## Downloadable packages
 
-The [alpha test release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.9) provides three packages:
+The following [previous alpha test release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.9) predates the routing/privacy review fixes. Those ZIPs do **not** contain the fixes documented in [REVIEW_FIXES.md](docs/REVIEW_FIXES.md). The corrected source candidate is `0.1.0-alpha.10`; do not infer a published release from that version.
+
+Previous packages, retained for provenance:
 
 - [Server only for your VPS/backend](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.9/hermes-jev-performance-server-only-0.1.0-alpha.9.zip)
 - [Desktop dashboard for your computer](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.9/hermes-jev-performance-desktop-dashboard-0.1.0-alpha.9.zip)

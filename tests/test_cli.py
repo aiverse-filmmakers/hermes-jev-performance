@@ -37,6 +37,19 @@ class FakeTelemetry:
 
 
 class CliTests(unittest.TestCase):
+    def test_compaction_external_opt_in_is_separate_and_revocable(self):
+        ctx = FakeContext()
+        _, output, _, _ = self.parse_and_run(["compaction", "on"], ctx=ctx)
+        self.assertIn("separate", output)
+        self.assertNotIn("compaction_allow_external", ctx.settings)
+        _, output, _, _ = self.parse_and_run(["compaction", "allow-external"], ctx=ctx)
+        self.assertIs(ctx.settings["compaction_allow_external"], True)
+        self.assertIn("SHADOW", output)
+        self.assertIn("history", output)
+        self.assertIn("charges", output)
+        self.parse_and_run(["compaction", "deny-external"], ctx=ctx)
+        self.assertIs(ctx.settings["compaction_allow_external"], False)
+
     def test_missing_optional_benchmark_suite_gives_actionable_preview_error(self):
         code, output, _, _ = self.parse_and_run(['benchmark', '--fixtures', '/synthetic-not-present/suite.json'])
         self.assertEqual(code, 2)

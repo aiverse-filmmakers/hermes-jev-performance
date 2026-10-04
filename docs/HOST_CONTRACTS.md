@@ -38,3 +38,9 @@ This records source evidence used during the installation split. Source inspecti
 - Automatic context-engine settings write; use documented settings/manual setup unless a supported public writer is proven.
 
 No minimum Desktop version should be advertised until the supported Desktop release is tested. Server compatibility and Desktop compatibility are separate claims.
+
+## Review-correction verification
+
+The alpha.10 corrections run the offline loader/API suite (5 tests) and expanded native compaction suite (11 tests) against reference source `7533bd2756b9526b52f527f737420a19e57331d7`, using Python 3.11.16. The latter includes real normal compression assembly with only the provider mocked, summarize-then-recover, fresh engine/session ownership, compression rotation, real agent commit and carried-tail recall behavior. These runs use temporary profiles and forbid provider network access.
+
+An additional older development checkout (`29d4c0ebfde82ad8ae3d411f1ad2c401199d37a7`) passes the compaction suite, but its loader/API checks do not run successfully with this runtime because required YAML/host modules are missing. It is not evidence of installer/API compatibility. No claim is made about the user's actual VPS serving runtime/profile. See [TESTING.md](TESTING.md#routing-and-compaction-review-corrections) and [REVIEW_FIXES.md](REVIEW_FIXES.md).
