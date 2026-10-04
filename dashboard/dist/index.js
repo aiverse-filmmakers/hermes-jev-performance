@@ -212,8 +212,8 @@
           ? "Suspended: global Jev mode is OFF."
           : "SHADOW measures decisions and leaves output unchanged. Archives are private to this Hermes profile."),
         h("p", { className: "jv-mode-help" }, data.external_transmission_allowed === true
-          ? "Compaction ON and SHADOW can send redacted conversation history, memory excerpts and tool previews to OpenRouter and incur charges."
-          : "External compaction transmission is blocked. Keep compaction OFF while evaluating routing. Separate opt-in: /jev compaction allow-external."),
+          ? "Compaction ON and SHADOW can send redacted conversation history, memory excerpts and complete redacted tool-output chunks to OpenRouter and incur charges."
+          : "External compaction transmission is blocked. Compaction starts OFF and can be enabled separately after engine setup and external-data consent. Separate opt-in: /jev compaction allow-external."),
         h("div", { className: "jv-config-grid" },
           h("div", null, h("span", null, "24h attempts"), h("strong", null, fmtInt(stats.attempts))),
           h("div", null, h("span", null, "Applied / fallback"), h("strong", null, fmtInt(stats.applied) + " / " + fmtInt(stats.fallback))),

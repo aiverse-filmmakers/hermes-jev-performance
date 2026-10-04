@@ -6,7 +6,7 @@ const PAGE = '/jev-performance'
 const ID = 'hermes-jev-performance'
 const MODES = ['off', 'shadow', 'on']
 const OPTIONS = { timeoutMs: 8000 }
-export const VERSION = '0.1.0-alpha.10'
+export const VERSION = '0.1.0-alpha.11'
 
 const scopeKey = scope => JSON.stringify([scope.connectionId || 'local', scope.profile || 'default'])
 const scopeLabel = scope => `${scope.connectionId || 'This computer'} · ${scope.profile || 'default'}`
@@ -191,8 +191,8 @@ export function PerformancePage({ rest }) {
       jsx(Card, { title: 'Recoverable compaction', children: jsxs('div', { className: 'space-y-3', children: [
         jsx(ModeButtons, { value: health.compaction_mode, disabled: saving || health.capabilities?.compaction_mode_write !== true, canChoose: mode => mode === 'off' || engineReady, onSelect: mode => void session.current?.chooseMode('/compaction', mode) }),
         jsx('p', { className: 'text-xs', children: status.compaction?.external_transmission_allowed === true
-          ? 'Compaction On and Shadow may send redacted history, memory excerpts and tool previews to OpenRouter and incur charges. Only exact duplicate outputs are eligible for archiving.'
-          : 'External compaction transmission is blocked. Keep compaction Off while evaluating routing. To allow paid history, memory and tool-preview transmission, explicitly opt in with /jev compaction allow-external.' }),
+          ? 'Compaction On and Shadow may send redacted history, memory excerpts and complete redacted tool-output chunks to OpenRouter and incur charges. Older unique outputs can be archived only when every complete chunk passes the relevance threshold; uncertain output stays.'
+          : 'External compaction transmission is blocked. Compaction starts Off; select the native engine and allow external data to enable it. To allow paid history, memory and tool-output transmission, explicitly opt in with /jev compaction allow-external.' }),
         status.compaction?.suspended_by_global_off ? jsx('p', { className: 'text-xs', children: 'Compaction is suspended while tool routing is Off. Its saved mode resumes when global routing is enabled.' }) : null,
         !engineReady ? jsx('p', { className: 'text-xs', children: 'Choose the Jev Performance context engine and restart the agent before enabling compaction.' }) : null
       ] }) })

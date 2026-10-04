@@ -3,7 +3,7 @@
   "label": "Jev Performance backend API",
   "description": "Backend data API for the native Jev Performance Desktop plugin.",
   "icon": "Activity",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.11",
   "tab": {
     "path": "/jev-performance",
     "hidden": true

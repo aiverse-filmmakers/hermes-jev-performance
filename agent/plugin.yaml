@@ -1,5 +1,5 @@
 name: "hermes-jev-performance"
-version: "0.1.0-alpha.10"
+version: "0.1.0-alpha.11"
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
@@ -48,15 +48,11 @@ config_schema:
   compaction_drop_confidence:
     type: "float"
     default: 0.9
-    description: "Minimum archive probability for outputs with a complete exact duplicate retained in context."
+    description: "Minimum archive probability required for every complete redacted chunk of an older tool output."
   compaction_min_drop_chars:
     type: "int"
     default: 1500
     description: "Outputs below this size stay verbatim."
-  compaction_preview_chars:
-    type: "int"
-    default: 600
-    description: "Combined head/tail preview size sent to Jev after redaction."
   compaction_preserve_recent_messages:
     type: "int"
     default: 6
@@ -84,4 +80,8 @@ config_schema:
   compaction_allow_external:
     type: "bool"
     default: false
-    description: "Separate opt-in for paid OpenRouter compaction calls sending redacted conversation/memory excerpts and tool previews, including SHADOW. Default blocks transmission."
+    description: "Separate opt-in for paid OpenRouter compaction requests containing redacted conversation/memory context and complete tool-output chunks, including SHADOW."
+  compaction_chunk_chars:
+    type: "int"
+    default: 12000
+    description: "Maximum characters per complete redacted tool-output chunk sent to Jev. Every chunk must pass before archiving."

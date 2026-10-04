@@ -18,9 +18,9 @@ Agent 0.21.5 or newer is the declared minimum. Native loader/API tests run again
 
 New installations start with Jev routing and compaction OFF. No Jev requests are made until you choose a mode. Add the Jev/OpenRouter credential through that Hermes backend's secure credential or environment settings; never paste a key into chat. Choosing Shadow sends Jev requests and may incur provider charges, while keeping current tool behavior unchanged.
 
-The server source folder is available in the [official GitHub repository](https://github.com/aiverse-filmmakers/hermes-jev-performance/tree/main/agent). Hermes normally downloads and installs it for you. For a repeatable evaluation, use the [alpha.10 Server ZIP](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.10/hermes-jev-performance-server-only-0.1.0-alpha.10.zip) or the pinned installer command in the [client handoff](CLIENT_HANDOFF.md). Previous alpha.9 ZIPs predate the routing/privacy review fixes.
+The server source folder is available in the [official GitHub repository](https://github.com/aiverse-filmmakers/hermes-jev-performance/tree/main/agent). Hermes normally downloads and installs it for you. For a repeatable evaluation, use the [alpha.11 Server ZIP](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/download/v0.1.0-alpha.11/hermes-jev-performance-server-only-0.1.0-alpha.11.zip) or the pinned installer command in the [client handoff](CLIENT_HANDOFF.md).
 
-Keep compaction OFF during routing evaluation. It has a separate privacy boundary and external-data opt-in; see [review fixes](REVIEW_FIXES.md). Selecting its mode alone cannot authorize transmission. Evaluate only in an isolated profile after selecting the native engine, restarting it, and deliberately allowing paid history/memory/tool-preview transmission with `/jev compaction allow-external`.
+Compaction starts OFF; enable it deliberately using the [compaction guide](COMPACTION.md). It has a separate privacy boundary and external-data opt-in; see [review fixes](REVIEW_FIXES.md). Selecting its mode alone cannot authorize transmission. Evaluate only in an isolated profile after selecting the native engine, restarting it, and deliberately allowing paid history/memory/tool-output transmission with `/jev compaction allow-external`.
 
 ## Ask Hermes in normal language
 

@@ -33,6 +33,6 @@ To disable the plugin itself:
 hermes plugins disable hermes-jev-performance
 ```
 
-Keep compaction OFF during routing evaluation. Experimental compaction requires native engine selection, restart, and the separate `/jev compaction allow-external` opt-in for paid OpenRouter transmission of redacted conversation history, memory excerpts and tool previews (including Shadow). `/jev compaction deny-external` blocks those transmissions. Only older outputs with a complete exact duplicate retained in context can be archived. Review `docs/REVIEW_FIXES.md` before an isolated trial.
+Compaction starts OFF; enable it deliberately using the compaction guide. Experimental compaction requires native engine selection, restart, and the separate `/jev compaction allow-external` opt-in for paid OpenRouter transmission of redacted conversation history, memory excerpts and complete redacted tool-output chunks (including Shadow). `/jev compaction deny-external` blocks those transmissions. Unique older outputs can be archived when every complete redacted chunk passes the threshold. Follow `docs/COMPACTION.md` for activation and recovery.
 
 Full install, upgrade, rollback and uninstall instructions are in `docs/INSTALL.md`.
