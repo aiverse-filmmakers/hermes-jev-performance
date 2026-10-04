@@ -4,7 +4,7 @@
 
 Open the [Desktop install guide](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/docs/INSTALL_DESKTOP_WITH_VPS.md) for the official install link and setup checklist.
 
-For a Desktop ZIP from the [alpha.11 release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.11): extract it, open Hermes Desktop **Settings → Plugins → Open plugins folder**, and move the extracted `hermes-jev-performance` folder there. `plugin.js` must sit directly inside it. Click **Rescan**, enable **Jev Performance**, then open its sidebar entry. Check the displayed connection/profile and Server version.
+For a Desktop ZIP from the [alpha.12 release](https://github.com/aiverse-filmmakers/hermes-jev-performance/releases/tag/v0.1.0-alpha.12): extract it, open Hermes Desktop **Settings → Plugins → Open plugins folder**, and move the extracted `hermes-jev-performance` folder there. `plugin.js` must sit directly inside it. Click **Rescan**, enable **Jev Performance**, then open its sidebar entry. Check the displayed connection/profile and Server version.
 
 To update manually, replace `plugin.js` from the official source and click **Rescan**. To disable, turn off its Desktop switch. To remove, disable first, then delete only its `hermes-jev-performance` folder from the opened Desktop plugins folder and click **Rescan**. The Server component and its data have their own lifecycle.
 

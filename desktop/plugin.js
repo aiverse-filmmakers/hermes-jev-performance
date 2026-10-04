@@ -6,7 +6,7 @@ const PAGE = '/jev-performance'
 const ID = 'hermes-jev-performance'
 const MODES = ['off', 'shadow', 'on']
 const OPTIONS = { timeoutMs: 8000 }
-export const VERSION = '0.1.0-alpha.11'
+export const VERSION = '0.1.0-alpha.12'
 
 const scopeKey = scope => JSON.stringify([scope.connectionId || 'local', scope.profile || 'default'])
 const scopeLabel = scope => `${scope.connectionId || 'This computer'} · ${scope.profile || 'default'}`

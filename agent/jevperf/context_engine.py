@@ -79,7 +79,7 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
             session = getattr(self, "_session_id", "")
             sessions = []
             db = getattr(self, "_session_db", None)
-            while session and session not in sessions and len(sessions) < 64:
+            while session and session not in sessions:
                 sessions.append(session)
                 if db is None:
                     break
@@ -163,13 +163,29 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
                 # current_tokens may include schemas/system overhead that is not compactable.
                 overhead = max(0, (current_tokens or 0) - estimate)
                 target = max(1, int(self.threshold_tokens * 0.9) - overhead)
+                drawer = self.jev_archive or OutputArchive()
                 result = self.jev_compactor.compact(
                     messages, config=settings, model=routing.model, timeout=routing.timeout_seconds,
-                    archive=self.jev_archive or OutputArchive(), session_id=getattr(self, "_session_id", ""),
+                    archive=drawer, session_id=getattr(self, "_session_id", ""),
                     focus=focus_topic or "", target_tokens=target,
                     memory_context=memory_context, should_abort=self._attempt_cancelled,
                 )
                 if self._attempt_cancelled() or result.outcome == "stale_attempt":
+                    # Billing belongs to the attempted provider call even when
+                    # the host no longer owns the transcript generation.
+                    if routing.telemetry_enabled and result.requests:
+                        metadata = {**result.metadata(), "outcome": "stale_attempt",
+                                    "estimated_tokens_after": result.estimated_tokens_before}
+                        try:
+                            metrics_recorder(metadata)
+                        except Exception:
+                            pass
+                    if result.archive_references:
+                        try:
+                            drawer.discard_unpublished(result.archive_references)
+                            result.archive_references.clear()
+                        except (OSError, ValueError):
+                            pass  # Host remains unchanged even if disk cleanup fails.
                     return messages
                 self.jev_last_result = result.metadata()
                 if routing.telemetry_enabled:

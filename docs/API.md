@@ -11,7 +11,7 @@ Every route accepts Hermes' optional `profile` query parameter. A named profile 
 ```json
 {
   "plugin_id": "hermes-jev-performance",
-  "backend_version": "0.1.0-alpha.11",
+  "backend_version": "0.1.0-alpha.12",
   "api_schema_version": 1,
   "routing_mode": "off",
   "compaction_mode": "off",

@@ -38,7 +38,7 @@ class RoutingReviewTests(unittest.TestCase):
     def test_json_env_and_quoted_multiword_secrets_are_fully_redacted(self):
         samples = [
             '{"password": "synthetic two word value", "task": "search the web"}',
-            "OPENROUTER_API_KEY=synthetic-value search the web",
+            "OPENROUTER_API_KEY=synthetic-value; search the web",
             "password='synthetic two word value' search the web",
             'password="synthetic \\"quoted\\" value" search the web',
             '{"auth": {"credentials": {"nested": "synthetic-value"}}, "task": "search"}',
@@ -335,9 +335,15 @@ class CompactionReviewTests(unittest.TestCase):
 
     def test_cancellation_during_archive_batch_rolls_back_new_output(self):
         entries = [(self.archive.reference("synthetic-session"), "new exact output") for _ in range(2)]
-        checks = iter((False, True))
-        with self.assertRaises(InterruptedError):
-            self.archive.write_batch(entries, should_abort=lambda: next(checks))
+        cancelled = False
+        write_index = self.archive._write_index
+        def cancel_after_first_index(folder, record):
+            nonlocal cancelled
+            write_index(folder, record)
+            cancelled = True
+        with mock.patch.object(self.archive, "_write_index", side_effect=cancel_after_first_index):
+            with self.assertRaises(InterruptedError):
+                self.archive.write_batch(entries, should_abort=lambda: cancelled)
         self.assertEqual(list(self.archive.root.rglob("*.txt")), [])
         self.assertEqual(list(self.archive.root.rglob("INDEX.json")), [])
 
