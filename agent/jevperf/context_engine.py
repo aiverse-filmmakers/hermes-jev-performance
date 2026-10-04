@@ -5,7 +5,7 @@ import inspect
 import json
 from typing import Any
 
-from .compaction import JevCompactor, STUB_PREFIX, estimated_tokens
+from .compaction import JevCompactor, estimated_tokens
 from .compaction_archive import OutputArchive, REFERENCE_RE
 from .compaction_config import read_compaction_config
 from .compaction_metrics import record_compaction
@@ -15,7 +15,7 @@ from .config import read_config
 ENGINE_NAME = "hermes-jev-performance"
 RECOVERY_TOOL = {
     "name": "jev_recover",
-    "description": "Recover exact archived Jev tool output using a reference in this conversation. "
+    "description": "Recover exact archived Jev tool output using a reference owned by this session. "
                    "Read pages using next_offset; do not rerun the original tool.",
     "parameters": {
         "type": "object", "properties": {
@@ -74,6 +74,55 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
         def get_tool_schemas(self):
             return [*super().get_tool_schemas(), RECOVERY_TOOL]
 
+        def _recovery_sessions(self):
+            # Bind authorization to host state, never model arguments or text.
+            session = getattr(self, "_session_id", "")
+            sessions = []
+            db = getattr(self, "_session_db", None)
+            while session and session not in sessions and len(sessions) < 64:
+                sessions.append(session)
+                if db is None:
+                    break
+                try:
+                    child = db.get_session(session) or {}
+                    parent_id = child.get("parent_session_id")
+                    if not parent_id:
+                        break
+                    parent = db.get_session(parent_id) or {}
+                    model_config = child.get("model_config") or {}
+                    if isinstance(model_config, str):
+                        model_config = json.loads(model_config)
+                    # Exclude branch/delegate edges even if an old host resolver
+                    # treats a parent ended on compression as sufficient.
+                    if (parent.get("end_reason") != "compression" or
+                            child.get("source") != parent.get("source") or
+                            any(model_config.get(k) for k in ("_delegate_from", "_branched_from")) or
+                            db.get_compression_tip(parent_id) != sessions[0]):
+                        break
+                except Exception:
+                    # An unreadable lineage fails closed for ancestors, without
+                    # blocking the normal compressor or current-session recovery.
+                    break
+                session = parent_id
+            return sessions
+
+        def _owned_reference(self, reference):
+            return any(OutputArchive.owns(reference, session) for session in self._recovery_sessions())
+
+        def _attempt_cancelled(self):
+            # Preserve the host's cooperative fence and generation ownership.
+            try:
+                from agent.conversation_compression import _caller_attempt_is_current
+                if not _caller_attempt_is_current(self):
+                    return True
+            except ImportError:
+                pass
+            check = getattr(self, "_compression_cancelled_check", None)
+            try:
+                return bool(check()) if callable(check) else False
+            except Exception:
+                return True
+
         def handle_tool_call(self, name, args, **kwargs):
             if name != "jev_recover":
                 return super().handle_tool_call(name, args, **kwargs)
@@ -81,14 +130,10 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
                 reference = args.get("reference")
                 if not isinstance(reference, str) or REFERENCE_RE.fullmatch(reference) is None:
                     raise ValueError("invalid_reference")
-                # Authorize from actual tool-result labels in the current transcript.
-                # This also survives resume/rotation without persisting an in-memory allowlist.
-                allowed = any(isinstance(m, dict) and m.get("role") == "tool" and
-                              isinstance(m.get("content"), str) and
-                              m["content"].startswith(STUB_PREFIX + reference + ";")
-                              for m in kwargs.get("messages") or [])
-                if not allowed:
-                    return json.dumps({"error": "Reference is not present in this conversation."})
+                # A durable private archive index plus its session namespace is
+                # authoritative even after normal summarization removes a label.
+                if not self._owned_reference(reference):
+                    return json.dumps({"error": "Reference does not belong to this session."})
                 drawer = self.jev_archive or OutputArchive()
                 payload = drawer.recover(reference, offset=args.get("offset", 0), limit=args.get("limit", 20000))
                 self._recovery_metric("recovered")
@@ -108,6 +153,8 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
                      memory_context="", **kwargs):
             settings = read_compaction_config(self.jev_settings)
             routing = read_config(self.jev_settings)
+            if self._attempt_cancelled():
+                return messages
             # Global OFF and controlled OFF benchmarks make zero Jev calls.
             if routing.mode == "off" or routing.provider != "openrouter" or settings.mode == "off":
                 return self._normal_compress(messages, current_tokens, focus_topic, force, memory_context, kwargs)
@@ -120,7 +167,10 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
                     messages, config=settings, model=routing.model, timeout=routing.timeout_seconds,
                     archive=self.jev_archive or OutputArchive(), session_id=getattr(self, "_session_id", ""),
                     focus=focus_topic or "", target_tokens=target,
+                    memory_context=memory_context, should_abort=self._attempt_cancelled,
                 )
+                if self._attempt_cancelled() or result.outcome == "stale_attempt":
+                    return messages
                 self.jev_last_result = result.metadata()
                 if routing.telemetry_enabled:
                     try:
@@ -132,6 +182,11 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
                     # Every returned row must be a copy without stale persistence marks.
                     out = [{k: v for k, v in m.items() if k not in {"_db_persisted", "_row_id"}}
                            for m in result.messages]
+                    # Hermes' marker means a CONTIGUOUS carried tail. Tag only
+                    # the unchanged suffix; tagging interior rows miscounts originals.
+                    last_changed = max(i for i, (old, new) in enumerate(zip(messages, result.messages)) if old is not new)
+                    for row in out[last_changed + 1:]:
+                        row["_compaction_tail"] = True
                     self.compression_count += 1
                     self._last_compression_made_progress = True
                     self._last_compress_aborted = False
@@ -150,7 +205,26 @@ def create_context_engine(ctx: Any = None, *, compactor: Any = None, archive: An
             options = {"current_tokens": current_tokens, "focus_topic": focus_topic,
                        "force": force, "memory_context": memory_context, **kwargs}
             allowed = inspect.signature(super().compress).parameters
-            return super().compress(messages, **{k: v for k, v in options.items() if k in allowed})
+            references = sorted({ref for m in messages if isinstance(m, dict) and isinstance(m.get("content"), str)
+                                 for ref in REFERENCE_RE.findall(m["content"]) if self._owned_reference(ref)})
+            out = super().compress(messages, **{k: v for k, v in options.items() if k in allowed})
+            if self._attempt_cancelled() or out is messages or not references:
+                return out
+            # Restore discovery deterministically; authorization does not depend
+            # on this footer's role or on the summarizer copying it correctly.
+            missing = [ref for ref in references if not any(isinstance(m.get("content"), str) and ref in m["content"] for m in out)]
+            if not missing:
+                return out
+            footer = "\n\n[Jev recovery references retained for this session]\n" + "\n".join(
+                f"jev_recover(reference='{ref}')" for ref in missing)
+            from agent.context_compressor import is_compaction_summary_message
+            out = [dict(m) for m in out]
+            summary = next((m for m in out if is_compaction_summary_message(m) and isinstance(m.get("content"), str)), None)
+            if summary is not None:
+                summary["content"] += footer
+            else:
+                out.append({"role": "assistant", "content": footer.strip()})
+            return out
 
     return HermesJevContextEngine()
 

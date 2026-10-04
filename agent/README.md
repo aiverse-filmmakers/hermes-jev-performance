@@ -6,6 +6,8 @@ For beginner instructions, see [Install Server only](https://github.com/aiverse-
 
 New installs leave routing and compaction **OFF**. Add the Jev credential through Hermes' secure settings on this backend; never paste it into chat. Shadow sends Jev requests and can incur charges.
 
+Keep compaction OFF while evaluating routing. Compaction has a separate `compaction_allow_external` setting (default false): even compaction Shadow is blocked until deliberately opted in. When allowed, it may send redacted history, memory excerpts and tool previews to OpenRouter and incur charges. Use `/jev compaction allow-external` or `/jev compaction deny-external` to control that boundary; mode alone does not grant permission.
+
 The small hidden browser entry exists only because Hermes' backend dashboard loader expects an entry script when mounting the authenticated data API. It renders no page. The native visual dashboard is a separate install for the computer running Hermes Desktop.
 
 See the [MIT license](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/LICENSE) and [third-party notices](https://github.com/aiverse-filmmakers/hermes-jev-performance/blob/main/THIRD_PARTY_NOTICES.md).

@@ -1,6 +1,6 @@
 # Implementation and verification status
 
-**The corrected packages are an alpha test candidate. Production verification still requires the real Desktop/VPS checks below.** Official source: `aiverse-filmmakers/hermes-jev-performance`, branch `main`.
+**Version 0.1.0-alpha.10 is an alpha release for client evaluation. Production verification still requires the real Desktop/VPS checks below.** Official source: `aiverse-filmmakers/hermes-jev-performance`, branch `main`. Use the [client handoff](CLIENT_HANDOFF.md) for a repeatable versioned installation.
 
 ## Available components
 
@@ -18,6 +18,8 @@
 - Builds contain one installable `hermes-jev-performance` folder. Check each release's `release-manifest.json`, inventory, and SHA-256 files for exact sizes and checksums. Source timestamps and permissions do not alter the ZIP bytes.
 
 For exact commands and test counts from the correction run, see [TESTING.md](TESTING.md#installation-split-correction-checks).
+
+The `0.1.0-alpha.10` release additionally fixes the routing/privacy review defects and adds a separate external-data compaction gate. See [REVIEW_FIXES.md](REVIEW_FIXES.md) for behavior, evidence and remaining limits. Previous `0.1.0-alpha.9` release ZIPs do not contain those fixes. Keep compaction OFF during routing evaluation.
 
 ## Still needs a real app or service
 

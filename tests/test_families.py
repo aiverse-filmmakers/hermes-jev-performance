@@ -42,7 +42,7 @@ class FamilyTests(unittest.TestCase):
         self.assertIn("clarify", names)
         self.assertIn("custom_future_tool", names)
         self.assertNotIn("terminal", names)
-        self.assertNotIn("read_file", names)
+        self.assertIn("read_file", names)
         self.assertIn("tool_call", names)
 
     def test_github_keeps_repo_primitives(self):

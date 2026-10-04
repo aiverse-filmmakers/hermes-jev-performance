@@ -83,7 +83,19 @@ ALWAYS_KEEP = frozenset({
     "tool_describe",
     "tool_call",
     "jev_recover",
+    "skills_list",
+    "skill_view",
+    "skill_manage",
+    "read_file",
+    "write_file",
+    "search_files",
+    "patch",
+    "memory",
 })
+
+# Host prerequisites may have version-specific names. Preserve their families
+# across every route, including eager tools that the deferred bridge cannot restore.
+PREREQUISITE_PREFIXES = ("skill_", "skills_", "file_", "files_", "memory_")
 
 FAMILY_EXACT: dict[str, frozenset[str]] = {
     "github": frozenset({
@@ -202,7 +214,9 @@ def filter_tools(tools: Any, family: str) -> tuple[Any, bool, str]:
         if name is None:
             filtered.append(tool)
             continue
-        if name in ALWAYS_KEEP:
+        if _matches_family(name, family):
+            matched_family = True
+        if name in ALWAYS_KEEP or name.startswith(PREREQUISITE_PREFIXES):
             filtered.append(tool)
             continue
         if _matches_family(name, family):

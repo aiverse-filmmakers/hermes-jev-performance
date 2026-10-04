@@ -59,7 +59,7 @@ Mode MUST persist across process restart and MUST be changeable without reinstal
 
 ### FR-005 Fresh-turn routing
 
-By default, the plugin MUST make at most one tool-family Jev routing request per fresh user turn. Tool-loop LLM calls MUST reuse the accepted turn route rather than repeatedly billing Jev.
+By default, the plugin MUST make at most one tool-family Jev routing request per fresh user turn. Tool-loop LLM calls MUST reuse that decision only while user state and routing configuration remain unchanged. New instructions, changed provider/model/confidence/timeout/mode or incomplete latest state MUST invalidate the restriction for the remainder of that turn without a second Jev call. A new turn may classify again. No history is transmitted to infer a continuation.
 
 ### FR-006 Routing taxonomy
 

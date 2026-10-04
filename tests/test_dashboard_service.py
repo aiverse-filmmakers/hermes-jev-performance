@@ -74,6 +74,7 @@ class DashboardServiceTests(unittest.TestCase):
         result = set_dashboard_compaction_mode("shadow", settings_writer=settings.writer,
                                               field_loader=settings.loader)
         self.assertEqual(result["mode"], "shadow")
+        self.assertNotIn("compaction_allow_external", settings.values)
         with self.assertRaises(RuntimeError):
             set_dashboard_compaction_mode("on", settings_writer=lambda *args: None,
                                           field_loader=settings.loader)
@@ -89,6 +90,15 @@ class DashboardServiceTests(unittest.TestCase):
         self.assertEqual(config.mode, "on")
         self.assertTrue(config.notice)
         self.assertEqual(settings.last_plugin_id, PLUGIN_ID)
+
+    def test_dashboard_reports_compaction_transmission_gate(self):
+        settings = SettingsHarness(compaction_mode="on")
+        store = self.make_store()
+        payload = status_payload(field_loader=settings.loader, store=store)
+        self.assertFalse(payload["compaction"]["external_transmission_allowed"])
+        settings.values["compaction_allow_external"] = True
+        payload = status_payload(field_loader=settings.loader, store=store)
+        self.assertTrue(payload["compaction"]["external_transmission_allowed"])
 
     def test_status_contains_safe_runtime_fields_and_24h_summary(self):
         settings = SettingsHarness(mode="shadow")

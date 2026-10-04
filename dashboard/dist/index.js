@@ -106,7 +106,7 @@
         props.mode === "off"
           ? "Jev is bypassed. Hermes runs normally and baseline turn telemetry can still be recorded."
           : props.mode === "shadow"
-            ? "Jev decides once per turn, but Hermes tools are not changed."
+            ? "Jev caches decisions while the user request and routing settings stay unchanged. Hermes tools are not changed."
             : "Confident single-family decisions may narrow known tool families. Unsafe or mixed decisions fail open."
       )
     );
@@ -197,7 +197,7 @@
       h(C.CardHeader, null, h(C.CardTitle, null, "Recoverable compaction · experimental")),
       h(C.CardContent, null,
         h("p", { className: "jv-mode-help" },
-          "Keep useful output word for word and archive older output for exact recovery. ",
+          "Archive only older outputs with a complete identical copy retained in context. ",
           "Activate the Jev context engine in Hermes settings and restart before testing."
         ),
         h("div", { className: "jv-mode-control", role: "group", "aria-label": "Jev compaction mode" },
@@ -211,6 +211,9 @@
         h("p", { className: "jv-mode-help" }, data.suspended_by_global_off
           ? "Suspended: global Jev mode is OFF."
           : "SHADOW measures decisions and leaves output unchanged. Archives are private to this Hermes profile."),
+        h("p", { className: "jv-mode-help" }, data.external_transmission_allowed === true
+          ? "Compaction ON and SHADOW can send redacted conversation history, memory excerpts and tool previews to OpenRouter and incur charges."
+          : "External compaction transmission is blocked. Keep compaction OFF while evaluating routing. Separate opt-in: /jev compaction allow-external."),
         h("div", { className: "jv-config-grid" },
           h("div", null, h("span", null, "24h attempts"), h("strong", null, fmtInt(stats.attempts))),
           h("div", null, h("span", null, "Applied / fallback"), h("strong", null, fmtInt(stats.applied) + " / " + fmtInt(stats.fallback))),

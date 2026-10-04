@@ -33,6 +33,6 @@ To disable the plugin itself:
 hermes plugins disable hermes-jev-performance
 ```
 
-Recoverable compaction is opt-in. Set `context.engine: hermes-jev-performance` in the Hermes profile, restart Hermes, and use `/jev compaction shadow` before enabling it with `/jev compaction on`.
+Keep compaction OFF during routing evaluation. Experimental compaction requires native engine selection, restart, and the separate `/jev compaction allow-external` opt-in for paid OpenRouter transmission of redacted conversation history, memory excerpts and tool previews (including Shadow). `/jev compaction deny-external` blocks those transmissions. Only older outputs with a complete exact duplicate retained in context can be archived. Review `docs/REVIEW_FIXES.md` before an isolated trial.
 
 Full install, upgrade, rollback and uninstall instructions are in `docs/INSTALL.md`.

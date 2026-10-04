@@ -30,6 +30,11 @@ def transcript(outputs=1):
         ])
     rows += [{"role": "assistant", "content": "Log reviewed."},
              {"role": "user", "content": "Now compare the latest config."}]
+    # Retain a real, complete identical result; a prose claim of redundancy is
+    # insufficient. This recent copy is never eligible for archival.
+    rows += [{"role": "assistant", "content": "", "tool_calls": [{"id": "retained", "type": "function",
+             "function": {"name": "read_file", "arguments": "{}"}}]},
+             {"role": "tool", "tool_call_id": "retained", "content": rows[4]["content"]}]
     rows += [{"role": "assistant", "content": f"recent {i}"} for i in range(5)]
     return rows
 
@@ -56,7 +61,7 @@ class CompactionTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir="/private/tmp" if Path("/private/tmp").exists() else None)
         self.addCleanup(self.temp.cleanup)
         self.archive = OutputArchive(Path(self.temp.name) / "archive")
-        self.config = CompactionConfig(mode="on")
+        self.config = CompactionConfig(mode="on", allow_external=True)
 
     def run_compaction(self, rows=None, engine=None, config=None, **kwargs):
         return (engine or compactor()).compact(rows or transcript(), config=config or self.config,
@@ -90,7 +95,7 @@ class CompactionTests(unittest.TestCase):
         for old, new in zip(rows, out.messages):
             if old["role"] != "tool":
                 self.assertIs(old, new)
-            else:
+            elif new["content"].startswith(STUB_PREFIX):
                 reference = new["content"].split(STUB_PREFIX, 1)[1].split(";", 1)[0]
                 drawer = OutputArchive(self.archive.root)
                 text, offset = "", 0

@@ -1,4 +1,4 @@
-"""Private, durable output drawer. No arbitrary path reads and no auto-deletion."""
+"""Private, bounded output drawer. Live recovery references are never auto-deleted."""
 from __future__ import annotations
 
 import hashlib
@@ -14,6 +14,7 @@ from .store import PLUGIN_DATA_DIR, current_hermes_home
 
 REFERENCE_RE = re.compile(r"[a-f0-9]{32}/[a-f0-9]{32}/[a-f0-9]{32}")
 MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
+MAX_DRAWER_BYTES = 512 * 1024 * 1024
 
 
 def archive_root() -> Path:
@@ -21,8 +22,23 @@ def archive_root() -> Path:
 
 
 class OutputArchive:
-    def __init__(self, root: Path | None = None):
+    def __init__(self, root: Path | None = None, *, max_bytes: int = MAX_DRAWER_BYTES):
         self.root = Path(root) if root is not None else archive_root()
+        self.max_bytes = max_bytes
+
+    @staticmethod
+    def owns(reference: str, session_id: str) -> bool:
+        return (bool(session_id) and isinstance(reference, str) and
+                REFERENCE_RE.fullmatch(reference) is not None and
+                reference.split("/", 1)[0] == hashlib.sha256(session_id.encode()).hexdigest()[:32])
+
+    @staticmethod
+    def _sync_directory(folder: Path) -> None:
+        fd = os.open(folder, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
 
     def reference(self, session_id: str) -> str:
         owner = hashlib.sha256(session_id.encode()).hexdigest()[:32]
@@ -38,7 +54,13 @@ class OutputArchive:
                 parts.append(path)
         for part in parts:
             if create:
-                part.mkdir(mode=0o700, exist_ok=True)
+                try:
+                    part.mkdir(mode=0o700)
+                except FileExistsError:
+                    pass
+                else:
+                    # Persist each newly linked ancestor, not just the final leaf.
+                    self._sync_directory(part.parent)
             info = part.lstat()
             if not stat.S_ISDIR(info.st_mode):
                 raise ValueError("unsafe_archive_directory")
@@ -47,28 +69,73 @@ class OutputArchive:
                     raise ValueError("unsafe_archive_permissions")
         return path
 
-    def write_batch(self, entries: list[tuple[str, str]]) -> None:
-        self._directory(create=True)
-        written = []
+    def write_batch(self, entries: list[tuple[str, str]], *, should_abort=None) -> None:
+        import fcntl
+
+        # Validate the entire batch before creating any content.
+        prepared = []
+        folders = set()
         for reference, text in entries:
-            if REFERENCE_RE.fullmatch(reference) is None:
+            if not isinstance(reference, str) or REFERENCE_RE.fullmatch(reference) is None:
                 raise ValueError("invalid_reference")
             raw = text.encode("utf-8")
             if len(raw) > MAX_ARCHIVE_BYTES:
                 raise ValueError("archive_too_large")
             directory, name = reference.rsplit("/", 1)
-            folder = self._directory(directory, create=True)
-            path = folder / (name + ".txt")
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-            fd = os.open(path, flags, 0o600)
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            written.append({"reference": reference, "characters": len(text),
-                            "sha256": hashlib.sha256(raw).hexdigest()})
-            # Each reference is self-contained, survives process exit, and has a local index.
-            self._write_index(folder, written[-1])
+            if directory in folders:
+                raise ValueError("duplicate_archive_directory")
+            folders.add(directory)
+            prepared.append((reference, raw, directory, name, len(text)))
+        self._directory(create=True)
+        fd = os.open(self.root / "LOCK", os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "rb") as lock:
+            info = os.fstat(lock.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise ValueError("unsafe_archive_lock")
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            used = 0
+            for folder, dirs, files in os.walk(self.root, followlinks=False):
+                self._directory(str(Path(folder).relative_to(self.root)) if Path(folder) != self.root else "")
+                if any((Path(folder) / d).is_symlink() for d in dirs):
+                    raise ValueError("unsafe_archive_directory")
+                for name in files:
+                    info = (Path(folder) / name).lstat()
+                    if not stat.S_ISREG(info.st_mode):
+                        raise ValueError("unsafe_archive_file")
+                    used += info.st_size
+            # Budget includes conservative index overhead. Fail open on capacity;
+            # never delete a still-recoverable output to make room.
+            if used + sum(len(p[1]) + 1024 for p in prepared) > self.max_bytes:
+                raise ValueError("archive_capacity")
+            created = []
+            try:
+                for reference, raw, directory, name, characters in prepared:
+                    if should_abort is not None and should_abort():
+                        raise InterruptedError("stale_compaction")
+                    owner = self._directory(directory.split("/")[0], create=True)
+                    folder = owner / directory.split("/")[1]
+                    folder.mkdir(mode=0o700)  # Refuse existing archives without touching them.
+                    created.append(folder)
+                    self._sync_directory(owner)
+                    path = folder / (name + ".txt")
+                    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+                    fd = os.open(path, flags, 0o600)
+                    with os.fdopen(fd, "wb") as stream:
+                        stream.write(raw)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    self._write_index(folder, {"reference": reference, "characters": characters,
+                                              "sha256": hashlib.sha256(raw).hexdigest()})
+                if should_abort is not None and should_abort():
+                    raise InterruptedError("stale_compaction")
+            except BaseException:
+                # Ordinary partial-batch failures cannot leave raw orphan output.
+                for folder in reversed(created):
+                    for path in folder.iterdir():
+                        path.unlink()
+                    folder.rmdir()
+                    self._sync_directory(folder.parent)
+                raise
 
     @staticmethod
     def _write_index(folder: Path, record: dict) -> None:
@@ -78,11 +145,7 @@ class OutputArchive:
             json.dump(record, stream)
             stream.flush()
             os.fsync(stream.fileno())
-        fd = os.open(folder, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        OutputArchive._sync_directory(folder)
 
     def recover(self, reference: str, *, offset: int = 0, limit: int = 20000) -> dict:
         if not isinstance(reference, str) or REFERENCE_RE.fullmatch(reference) is None:

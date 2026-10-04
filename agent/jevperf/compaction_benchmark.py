@@ -8,7 +8,7 @@ import tempfile
 import time
 from typing import Callable
 
-from .compaction import JevCompactor, STUB_PREFIX, estimated_tokens
+from .compaction import JevCompactor, RULEBOOK_VERSION, STUB_PREFIX, estimated_tokens
 from .compaction_archive import OutputArchive
 from .compaction_config import CompactionConfig
 
@@ -29,6 +29,11 @@ def fixture() -> tuple[list[dict], list[str], dict[str, bool]]:
         rows.append({"role": "tool", "tool_call_id": cid, "content": content})
         labels[f"archive_{len(rows)-1}"] = i == 0
     # Make the old data outside the normal compressor's protected tail too.
+    # The obsolete INFO result has a complete newer copy. Unique evidence stays.
+    rows += [{"role": "user", "content": "The complete INFO output was repeated."},
+             {"role": "assistant", "content": "", "tool_calls": [{"id": "retained-info", "type": "function",
+              "function": {"name": "read_file", "arguments": "{}"}}]},
+             {"role": "tool", "tool_call_id": "retained-info", "content": outputs[0]}]
     for i in range(18):
         rows += [{"role": "user", "content": f"Continue the synthetic audit step {i}."},
                  {"role": "assistant", "content": "The unresolved trace and config remain needed."}]
@@ -50,7 +55,7 @@ def run_compaction_probe(*, live: bool = False, model: str = "typesafe/jev-1.13"
         return sum(value in text for value in critical)
     before = estimated_tokens(rows)
     report = {"kind": "synthetic_fixture_live_jev" if live else "synthetic_contract_probe",
-              "rulebook": "compaction-v1", "critical_facts": len(critical), "arms": [],
+              "rulebook": RULEBOOK_VERSION, "critical_facts": len(critical), "arms": [],
               "claims": "Synthetic replay; not a real-task benchmark or calibrated accuracy guarantee."}
     report["arms"].append({"policy": "retain_all", "critical_recall": score(rows),
                            "estimated_context_tokens": before, "provider_cost_usd": None})
@@ -63,7 +68,7 @@ def run_compaction_probe(*, live: bool = False, model: str = "typesafe/jev-1.13"
     with tempfile.TemporaryDirectory() as temp:
         archive = OutputArchive(Path(temp).resolve() / "drawer")
         started = time.monotonic()
-        result = engine.compact(rows, config=replace(CompactionConfig(), mode="on"), model=model,
+        result = engine.compact(rows, config=replace(CompactionConfig(), mode="on", allow_external=True), model=model,
                                 timeout=timeout, archive=archive, session_id="synthetic-probe")
         recovery_ok = 0
         recovery_total = 0

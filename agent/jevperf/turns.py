@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 import hashlib
+import json
 import re
 import threading
 from typing import Any, Callable
@@ -12,12 +13,19 @@ from typing import Any, Callable
 MAX_ROUTING_STATE_CHARS = 12000
 MAX_CACHED_TURNS = 1024
 
+_CREDENTIAL_LABEL = r"[\w-]*(?:api[_-]?key|access[_-]?key|private[_-]?key|token|password|passwd|pwd|secret|credential|authorization)[\w-]*"
 _SECRET_ASSIGNMENT = re.compile(
-    r"(?i)\b(api[_-]?key|access[_-]?token|auth[_-]?token|password|secret)\b"
-    r"(\s*[:=]\s*)([^\s,;]+)"
+    rf'''(?ix)(?<![\w-])(["']?{_CREDENTIAL_LABEL}["']?)(\s*[:=]\s*)'''
+    r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;\}\]"']+)'''
 )
+_SENSITIVE_MARKER = re.compile(rf"(?i)\b{_CREDENTIAL_LABEL}\b|-----BEGIN [\w ]*PRIVATE KEY-----")
 _BEARER = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}")
-_COMMON_TOKEN = re.compile(r"\bsk-[A-Za-z0-9._-]{12,}\b")
+_COMMON_TOKEN = re.compile(
+    r"\b(?:sk-[A-Za-z0-9._-]{12,}|gh[pousr]_[A-Za-z0-9]{16,}|"
+    r"github_pat_[A-Za-z0-9_]{16,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b"
+)
+_URL_CREDENTIALS = re.compile(r"(?i)(https?://)[^\s/@]+:[^\s/@]+@")
+_FOLLOWUP = re.compile(r"(?i)^(?:(?:k|ok|okay|yes|sure)[,!. ]*)?(?:continue|proceed|finish|do it|go ahead|same|keep going)\b")
 
 
 def _content_text(content: Any) -> str:
@@ -32,12 +40,17 @@ def _content_text(content: Any) -> str:
             parts.append(item)
             continue
         if not isinstance(item, dict):
-            continue
+            return ""
+        if item.get("type") not in {None, "text", "input_text"}:
+            # A text caption alone cannot describe an attached image/file/audio.
+            return ""
         for key in ("text", "input_text", "content"):
             value = item.get(key)
             if isinstance(value, str) and value:
                 parts.append(value)
                 break
+        else:
+            return ""
     return "\n".join(parts)
 
 
@@ -50,20 +63,56 @@ def _last_user_text(items: Any) -> str:
     for item in reversed(items):
         if not isinstance(item, dict) or item.get("role") != "user":
             continue
-        text = _content_text(item.get("content"))
-        if text.strip():
-            return text
+        # Stop at the latest user, including an empty or image-only message.
+        return _content_text(item.get("content"))
     return ""
 
 
 def redact_routing_state(text: str) -> str:
+    # Whole JSON objects need structural handling (including nested/array values).
+    try:
+        value = json.loads(text)
+        def clean(item: Any) -> Any:
+            if isinstance(item, dict):
+                return {k: "<REDACTED>" if re.fullmatch(_CREDENTIAL_LABEL, k, re.I) else clean(v)
+                        for k, v in item.items()}
+            if isinstance(item, list):
+                return [clean(v) for v in item]
+            return item
+        if isinstance(value, (dict, list)):
+            text = json.dumps(clean(value), ensure_ascii=False)
+    except (ValueError, RecursionError):
+        pass
+    text = _URL_CREDENTIALS.sub(r"\1<REDACTED>@", text)
     text = _BEARER.sub("Bearer <REDACTED>", text)
     text = _COMMON_TOKEN.sub("<REDACTED_TOKEN>", text)
     text = _SECRET_ASSIGNMENT.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}<REDACTED>",
+        lambda match: match.group(0) if match.group(3).startswith(("{", "[")) else
+        f"{match.group(1)}{match.group(2)}<REDACTED>",
         text,
     )
     return text
+
+
+def safe_external_text(text: str) -> str | None:
+    """Reject sensitive formats we cannot confidently redact; never a DLP guarantee."""
+    for match in _SECRET_ASSIGNMENT.finditer(text):
+        # An unquoted multiword password has no trustworthy value boundary.
+        # Shell API-key assignments remain supported; quoted passwords are safe.
+        if (re.search(r"(?i)password|passwd|\bpwd\b", match.group(1)) and
+                not match.group(3).startswith(('"', "'")) and
+                re.match(r"[ \t]+[^\s,;}]", text[match.end():])):
+            return None
+    redacted = redact_routing_state(text)
+    # Embedded structured assignments and malformed quotes cannot be safely
+    # understood by the scalar regex. Do not transmit their remaining payload.
+    for match in _SECRET_ASSIGNMENT.finditer(redacted):
+        if match.group(3).startswith(("{", "[")):
+            return None
+    remainder = _SECRET_ASSIGNMENT.sub("", redacted)
+    if _SENSITIVE_MARKER.search(remainder):
+        return None
+    return redacted
 
 
 def extract_routing_state(request: Any) -> str | None:
@@ -71,16 +120,25 @@ def extract_routing_state(request: Any) -> str | None:
     if not isinstance(request, dict):
         return None
 
-    text = _last_user_text(request.get("messages"))
-    if not text:
-        text = _last_user_text(request.get("input"))
-    if not text:
+    # The serving API's selected transcript is authoritative. Never fall back
+    # to another field after finding an unusable latest message.
+    items = request.get("messages") if "messages" in request else request.get("input")
+    text = _last_user_text(items).strip()
+    if not text or len(text) > MAX_ROUTING_STATE_CHARS:
         return None
+    user_count = sum(isinstance(m, dict) and m.get("role") == "user" for m in items) if isinstance(items, list) else 1
+    if _FOLLOWUP.search(text) or (user_count > 1 and len(text.split()) <= 6):
+        # Do not transmit history to guess what a short continuation means.
+        return None
+    text = safe_external_text(text)
+    return text if text and len(text) <= MAX_ROUTING_STATE_CHARS else None
 
-    text = redact_routing_state(text.strip())
-    if len(text) > MAX_ROUTING_STATE_CHARS:
-        text = text[:MAX_ROUTING_STATE_CHARS]
-    return text or None
+
+def decision_key(key: str, state: str, config: Any) -> str:
+    """Invalidate by semantic state and decision settings without retaining text."""
+    values = [key, state, config.mode, config.provider, config.model,
+              config.min_confidence, config.timeout_seconds]
+    return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode()).hexdigest()
 
 
 def turn_key(session_id: Any, turn_id: Any) -> str | None:
@@ -111,10 +169,13 @@ class TurnDecisionCache:
 
     def put(self, key: str, value: Any) -> None:
         with self._lock:
-            self._items[key] = value
-            self._items.move_to_end(key)
-            while len(self._items) > self.max_entries:
-                self._items.popitem(last=False)
+            self._put_locked(key, value)
+
+    def _put_locked(self, key: str, value: Any) -> None:
+        self._items[key] = value
+        self._items.move_to_end(key)
+        while len(self._items) > self.max_entries:
+            self._items.popitem(last=False)
 
     def get_or_compute(self, key: str, factory: Callable[[], Any]) -> Any:
         """Return cached value or compute it once for this key under concurrency."""
@@ -134,9 +195,16 @@ class TurnDecisionCache:
                 if existing is not None:
                     return existing
                 value = factory()
-                if value is not None:
-                    self.put(key, value)
-                return value
+                with self._lock:
+                    # A concurrent invalidation is authoritative over a slow
+                    # classifier's response. Never revive the old restriction.
+                    existing = self._items.get(key)
+                    if existing is not None:
+                        self._items.move_to_end(key)
+                        return existing
+                    if value is not None:
+                        self._put_locked(key, value)
+                    return value
         finally:
             with self._lock:
                 if self._inflight.get(key) is key_lock and not key_lock.locked():

@@ -197,6 +197,8 @@ test('empty metrics, setup, suspended compaction and benchmark methodology are r
   const output = text(tree)
   assert.match(output, /No performance history yet/)
   assert.match(output, /suspended while tool routing is Off/)
+  assert.match(output, /External compaction transmission is blocked/)
+  assert.match(output, /compaction allow-external/)
   assert.match(output, /Synthetic test data · not measured/)
   assert.match(output, /another custom engine is your choice/)
   assert.match(output, /Review enabled plugins: jev-router/)

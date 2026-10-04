@@ -17,10 +17,10 @@ class TurnTests(unittest.TestCase):
             "messages": [
                 {"role": "user", "content": "old request"},
                 {"role": "assistant", "content": "old answer"},
-                {"role": "user", "content": "latest request"},
+                {"role": "user", "content": "Search the public web for the latest documentation."},
             ]
         }
-        self.assertEqual(extract_routing_state(request), "latest request")
+        self.assertEqual(extract_routing_state(request), "Search the public web for the latest documentation.")
 
     def test_extracts_responses_input_blocks(self):
         request = {
@@ -54,7 +54,7 @@ class TurnTests(unittest.TestCase):
         state = extract_routing_state({
             "messages": [{"role": "user", "content": "x" * (MAX_ROUTING_STATE_CHARS + 100)}]
         })
-        self.assertEqual(len(state), MAX_ROUTING_STATE_CHARS)
+        self.assertIsNone(state)
 
     def test_missing_user_state_fails_open(self):
         self.assertIsNone(extract_routing_state({"messages": [{"role": "assistant", "content": "hi"}]}))

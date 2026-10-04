@@ -113,10 +113,10 @@ The router acts only on a fresh user turn. It must use stable Hermes turn/sessio
 Per-turn state key:
 
 ```text
-(session_id, turn_id) -> RoutingDecision
+(session_id, turn_id) -> (opaque user-state/configuration hash, RoutingDecision)
 ```
 
-The cached decision is reused for later provider calls in the same tool loop.
+The cached decision is reused for later provider calls in the same tool loop only while usable user state and routing settings match. Changed or unusable inputs invalidate restrictions for the rest of that turn, with no second Jev call. A fresh turn can classify again. Raw prompt text is never stored in this cache.
 
 ### 4.2 Mode behavior
 

@@ -266,3 +266,28 @@ Offline native checks, using the dependency runtime belonging to the inspected H
 Correction results: **240 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests, and 6 native compaction tests**. Ruff 0.15.20 correctness checks (`E9,F`) also pass. The inspected host contracts use Hermes Agent source revision recorded in [HOST_CONTRACTS.md](HOST_CONTRACTS.md), with Python 3.11.16. JavaScript checks use Node 24.7.0 locally; CI uses Node 22.
 
 The native loader test uses temporary extracted packages and synthetic profile data. It loads/unloads/reloads through the actual host manager and preserves saved modes, metrics, exact archived output, and an unrelated plugin. Its API test uses Hermes' actual mount/auth middleware and real FastAPI validation. These tests do not install into a real profile, exercise Git update provenance, prove actual Desktop reconciliation, or replace remote/VPS and visual app gates.
+
+## Routing and compaction review corrections
+
+The `0.1.0-alpha.10` source candidate adds regressions for JSON/quoted/environment secrets, uncertain sensitive formats, eager prerequisites across both tool schemas, concurrent cache invalidation, changing user/configuration state without extra same-turn billing, empty/multimodal latest messages, short follow-ups, oversized suffix requirements, forced choices and injected caches.
+
+Compaction regressions cover the independent external-data gate, unique middle facts, retained full-content duplicates, nested JSON errors, bounded/redacted memory context, partial usage accounting, capacity exhaustion, partial-write/cancellation rollback, ancestor fsync and session ownership. Native tests exercise real summarizer assembly with a mocked provider boundary, fresh-engine recovery after summarization, actual agent commit/tail markers, database recall flags, concurrent append, compression rotation and stale-attempt suppression.
+
+Executed locally: **266 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests**. Python unit checks use 3.11.15; native checks use the available Hermes Python 3.11.16 runtime. Native reference source: `7533bd2756b9526b52f527f737420a19e57331d7`. The additional older checkout `29d4c0ebfde82ad8ae3d411f1ad2c401199d37a7` passes the 11 compaction contracts but cannot supply the current loader/API contract with this runtime (missing YAML/host modules); it is not a supported installer/API verification result.
+
+```sh
+PYTHONPATH=agent python3 -m unittest discover -s tests -q
+node --experimental-vm-modules --test tests/desktop.test.cjs
+ruff check --select E9,F
+python3 -m compileall -q __init__.py agent dashboard tests scripts
+python3 scripts/sync_manifests.py --check
+python3 scripts/public_repo_scan.py .
+python3 scripts/build_release.py --output <TEMP_RELEASE_FOLDER>
+python3 scripts/benchmark_compaction.py
+<HERMES_PYTHON> scripts/verify_host_contracts.py --hermes-source <HERMES_SOURCE>
+<HERMES_PYTHON> scripts/verify_native_compaction.py --hermes-source <HERMES_SOURCE>
+```
+
+The offline benchmark now retains a complete duplicate INFO output. Its numbers are not directly comparable to the alpha.9 fixture: that fixture allowed archiving unique output based on previews. The current labelled control applies, preserves 2/2 critical facts and recovers 1/1 archived output exactly. These are synthetic contract checks, not live accuracy or savings evidence.
+
+Routing and compaction remain OFF by default. All provider behavior above uses synthetic data and mocks. Nothing was installed/switched in a production profile and no paid provider call was made. See [REVIEW_FIXES.md](REVIEW_FIXES.md) for the remaining adoption and host transaction/recall limits.

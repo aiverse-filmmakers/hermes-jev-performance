@@ -63,7 +63,7 @@ class PluginTests(unittest.TestCase):
         command = ctx.commands["jev"]
         self.assertEqual(
             command["args_hint"],
-            "[status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|notice on|notice off|help]",
+            "[status|on|off|shadow|stats|doctor|compaction status|compaction off|compaction shadow|compaction on|compaction allow-external|compaction deny-external|notice on|notice off|help]",
         )
         self.assertIn("routing/performance", command["description"])
 

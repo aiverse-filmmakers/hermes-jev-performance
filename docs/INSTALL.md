@@ -10,7 +10,7 @@ Pick the install that matches where Hermes runs. The backend component belongs o
 
 New installs start with routing and recoverable compaction **OFF**. Confirm the target machine/profile in Hermes' installer. Run `/jev doctor` on that backend when installation finishes. Add the Jev/OpenRouter credential through Hermes' secure settings on the backend that will call Jev; do not put secrets into chat or the dashboard. Shadow sends requests and may incur provider charges, even though it leaves the tool choices unchanged.
 
-Compaction needs a separate Hermes profile setting: select `hermes-jev-performance` as `context.engine`, restart the agent, and check `/jev compaction status`. Begin in Shadow.
+Keep Jev compaction OFF during routing evaluation; Hermes' normal compression remains available. For a separate experimental compaction trial, select `hermes-jev-performance` as `context.engine` in an isolated profile, restart the agent, and check `/jev compaction status`. Deliberately allow the broader external-data boundary with `/jev compaction allow-external` before choosing compaction Shadow. Shadow can send redacted history, memory excerpts and tool previews to OpenRouter and incur charges. Selecting a mode alone does not grant that permission. See [review fixes and remaining limits](REVIEW_FIXES.md).
 
 ## Optional command-line controls
 

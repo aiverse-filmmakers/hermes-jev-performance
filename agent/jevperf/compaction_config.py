@@ -11,6 +11,7 @@ from .config import _get
 @dataclass(frozen=True)
 class CompactionConfig:
     mode: str = "off"
+    allow_external: bool = False
     drop_confidence: float = 0.90
     min_drop_chars: int = 1500
     preview_chars: int = 600
@@ -35,6 +36,10 @@ def read_compaction_config(ctx: Any) -> CompactionConfig:
         "deadline_seconds": (0.1, 30.0),
     }
     mode = _get(ctx, "compaction_mode", defaults.mode)
+    allow_external = _get(ctx, "compaction_allow_external", False)
+    if type(allow_external) is not bool:
+        warnings.append("invalid_compaction_allow_external")
+        allow_external = False
     if mode not in {"off", "shadow", "on"}:
         warnings.append("invalid_compaction_mode")
         mode = "off"
@@ -50,4 +55,5 @@ def read_compaction_config(ctx: Any) -> CompactionConfig:
         values[name] = value
     if values["max_state_tokens"] + 500 >= values["max_request_tokens"]:
         warnings.append("invalid_compaction_token_budgets")
-    return CompactionConfig(mode="off" if warnings else mode, warnings=tuple(warnings), **values)
+    return CompactionConfig(mode="off" if warnings else mode, allow_external=allow_external,
+                            warnings=tuple(warnings), **values)

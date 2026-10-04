@@ -89,7 +89,7 @@ class MiddlewareTests(unittest.TestCase):
         names = [item["name"] for item in updated["tools"]]
         self.assertEqual(
             names,
-            ["web_search", "tool_call", "clarify", "custom_future_tool"],
+            ["web_search", "read_file", "tool_call", "clarify", "custom_future_tool"],
         )
         self.assertEqual(updated["model"], original["model"])
         self.assertEqual(updated["base_url"], original["base_url"])
