@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0-alpha.11 — 4 October 2026
+
+Recoverable relevance compaction now supports unique older tool outputs. Jev assesses the complete redacted output in bounded chunks; every chunk must meet the archive threshold. Needed/uncertain parts and outputs that cannot be assessed completely stay. User/system constraints remain complete in decision state or the pass falls back. Head/tail previews and duplicate-only eligibility are no longer used.
+
+User instructions, recent exchanges, small outputs, recognized errors and tool-pair integrity remain protected. Exact paginated recovery survives summaries, fresh engines and verified session continuations in native Hermes contracts. Modes remain OFF on installation, with explicit external-data consent and a new [compaction activation guide](docs/COMPACTION.md).
+
+272 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests pass. Mixed-workflow fixtures cover research, files, media and publishing with critical facts hidden in the middle. Offline labelled replay reduces estimated context from 34,922 to 6,031 tokens, retains 2/2 critical facts and recovers 1/1 archived output exactly. These are synthetic checks, not measured live model accuracy or savings.
+
+Complete output chunks broaden the external-data boundary beyond prior previews. The old preview-size setting is ignored; `compaction_chunk_chars` defaults to 12,000. Existing modes and consent are preserved. Live provider/Desktop/VPS validation remains deployment-specific; [documented host integration limits](docs/COMPACTION.md#verified-behavior-and-practical-limits) remain.
+
 ## 0.1.0-alpha.10 — 4 October 2026
 
 Client evaluation release containing the routing/privacy review corrections. Routing and Jev compaction remain OFF on new installations. Existing routing settings are retained; compaction requires a new, separate external-data opt-in even when an older installation saved ON or SHADOW.

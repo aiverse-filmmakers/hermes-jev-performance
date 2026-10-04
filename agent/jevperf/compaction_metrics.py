@@ -14,7 +14,7 @@ from .store import default_db_path
 OUTCOMES = frozenset({"off", "no_candidates", "missing_credential", "archive_unavailable",
                       "keep_all", "insufficient_reduction", "still_over_budget", "shadow",
                       "applied", "deadline", "fallback_error", "recovered", "recovery_error",
-                      "external_not_approved", "stale_attempt"})
+                      "external_not_approved", "stale_attempt", "assessment_budget"})
 NUMERIC_FIELDS = ("candidates", "selected", "requests", "estimated_tokens_before",
                   "estimated_tokens_after", "latency_ms", "cost_usd", "input_tokens", "output_tokens",
                   "known_cost_usd", "known_input_tokens", "known_output_tokens")

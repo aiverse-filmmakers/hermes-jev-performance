@@ -140,14 +140,14 @@ def compaction_control(ctx: Any, action: str = "status") -> str:
         if not _set_setting(ctx, "compaction_allow_external", enabled):
             return "Compaction external-data setting could not be changed: persistent settings are unavailable."
         return ("Compaction external transmission: " + ("ALLOWED" if enabled else "BLOCKED") +
-                ". When allowed, compaction ON and SHADOW can send redacted conversation history (system/user/assistant excerpts), "
-                "memory excerpts and tool-output previews to OpenRouter and incur charges. Routing has separate controls.")
+                ". When allowed, compaction ON and SHADOW can send redacted textual constraints and conversation history, "
+                "memory excerpts and complete redacted tool-output chunks to OpenRouter and incur charges. Routing has separate controls.")
     if action in VALID_MODES:
         if not _set_setting(ctx, "compaction_mode", action):
             return "Compaction mode could not be changed: persistent settings are unavailable."
         return (f"Jev compaction: {action.upper()}. Select context.engine: hermes-jev-performance "
                 "in Hermes config and restart the agent/gateway to activate the native engine. "
-                "External history/tool preview transmission requires the separate /jev compaction allow-external opt-in. "
+                "External history/tool-output transmission requires the separate /jev compaction allow-external opt-in. "
                 "Global /jev off suspends all Jev calls.")
     if action != "status":
         return USAGE
@@ -158,10 +158,11 @@ def compaction_control(ctx: Any, action: str = "status") -> str:
         metrics = {}
     return "\n".join([
         "Jev compaction (experimental)", f"Mode: {config.mode}",
-        f"External history/memory/tool preview transmission: {'allowed' if config.allow_external else 'blocked'}",
+        f"External history/memory/tool-output transmission: {'allowed' if config.allow_external else 'blocked'}",
         "Native engine selection: context.engine: hermes-jev-performance (restart required)",
         f"Global OFF suspension: {'yes' if read_config(ctx).mode == 'off' else 'no'}",
         f"Drop confidence: {config.drop_confidence:.2f}",
+        f"Complete redacted assessment chunks: at most {config.chunk_chars} characters; every part must pass",
         f"Small outputs kept: below {config.min_drop_chars} characters",
         f"24h attempts/applied/fallback: {metrics.get('attempts', 'n/a')} / {metrics.get('applied', 'n/a')} / {metrics.get('fallback', 'n/a')}",
         f"Estimated context tokens saved: {metrics.get('estimated_tokens_saved', 'n/a')}",

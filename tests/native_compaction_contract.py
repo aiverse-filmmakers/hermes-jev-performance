@@ -169,9 +169,9 @@ class NativeCompactionContractTests(unittest.TestCase):
                 "SELECT active, compacted, COUNT(*) FROM messages WHERE session_id=? AND content=? GROUP BY active, compacted",
                 ("synthetic-session", original[8]["content"])).fetchall()
         visible = sum(row[2] for row in counts if row[0] or row[1])
-        # One archived changed result plus one active retained result; the old
-        # retained copy is superseded and must not become a third recall result.
-        self.assertEqual(visible, 2)
+        # The unchanged short baseline has one active copy. Its old carried
+        # original is superseded and must not become a second recall result.
+        self.assertEqual(visible, 1)
 
     def test_stale_attempt_cannot_publish_diagnostics_metrics_or_archives(self):
         metrics = mock.Mock()
@@ -213,7 +213,7 @@ class NativeCompactionContractTests(unittest.TestCase):
             counts = connection.execute(
                 "SELECT active, compacted, COUNT(*) FROM messages WHERE session_id=? AND content=? GROUP BY active, compacted",
                 ("synthetic-session", original[8]["content"])).fetchall()
-        self.assertEqual(sum(row[2] for row in counts if row[0] or row[1]), 2)
+        self.assertEqual(sum(row[2] for row in counts if row[0] or row[1]), 1)
 
     def test_bound_session_authorization_survives_real_compression_rotation(self):
         from hermes_state import SessionDB

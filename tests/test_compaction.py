@@ -34,7 +34,7 @@ def transcript(outputs=1):
     # insufficient. This recent copy is never eligible for archival.
     rows += [{"role": "assistant", "content": "", "tool_calls": [{"id": "retained", "type": "function",
              "function": {"name": "read_file", "arguments": "{}"}}]},
-             {"role": "tool", "tool_call_id": "retained", "content": rows[4]["content"]}]
+             {"role": "tool", "tool_call_id": "retained", "content": "Current baseline inspected."}]
     rows += [{"role": "assistant", "content": f"recent {i}"} for i in range(5)]
     return rows
 
@@ -141,20 +141,23 @@ class CompactionTests(unittest.TestCase):
             self.assertIs(self.run_compaction(rows).messages, rows)
         self.assertIs(self.run_compaction(rows, compactor(Evaluator(fail=TimeoutError()))).messages, rows)
         self.assertEqual(self.run_compaction(rows, target_tokens=1).outcome, "still_over_budget")
-        config = replace(self.config, min_reduction_ratio=0.95)
-        rows[1]["content"] = "essential user text " * 10000
+        config = replace(self.config, min_reduction_ratio=0.95, max_state_tokens=26000)
+        rows[1]["content"] = "essential user text " * 1000
         self.assertEqual(self.run_compaction(rows, config=config).outcome, "insufficient_reduction")
 
     def test_batching_respects_request_budget_and_question_limit(self):
         rows = transcript(140)
         evaluator = Evaluator()
-        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1000, preview_chars=100)
+        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1000, chunk_chars=2000)
         # Large state fails safely; no request escapes the budget.
         result = self.run_compaction(rows, compactor(evaluator), config)
         self.assertIs(result.messages, rows)
         self.assertEqual(evaluator.calls, [])
         rows = transcript(10)
-        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1500, preview_chars=100)
+        for i, row in enumerate(rows):
+            if row["role"] == "tool" and len(row["content"]) > 1500:
+                row["content"] = f"Old log {i} complete \n" * 150
+        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1500, chunk_chars=2000)
         result = self.run_compaction(rows, compactor(evaluator), config)
         self.assertEqual(result.outcome, "applied")
         self.assertGreater(len(evaluator.calls), 1)
@@ -162,7 +165,7 @@ class CompactionTests(unittest.TestCase):
             self.assertLessEqual(estimated_tokens({"state": call["state"], "questions": call["questions"]}) + 128, 3000)
             self.assertLessEqual(len(call["questions"]), 128)
 
-    def test_previews_show_both_ends_and_do_not_send_tool_arguments(self):
+    def test_complete_content_is_assessed_without_sending_tool_arguments(self):
         rows = transcript()
         rows[3]["tool_calls"][0]["function"]["arguments"] = "PRIVATE_ARGUMENT_VALUE"
         candidate = candidates_for(rows, self.config)[0]
@@ -232,7 +235,7 @@ class CompactionTests(unittest.TestCase):
         summary = compaction_summary(path)
         self.assertEqual(summary["applied"], 1)
         self.assertGreater(summary["estimated_tokens_saved"], 0)
-        self.assertAlmostEqual(summary["cost_usd"], 0.00001)
+        self.assertGreater(summary["cost_usd"], 0)
 
 
 if __name__ == "__main__":

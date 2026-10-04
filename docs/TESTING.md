@@ -291,3 +291,18 @@ python3 scripts/benchmark_compaction.py
 The offline benchmark now retains a complete duplicate INFO output. Its numbers are not directly comparable to the alpha.9 fixture: that fixture allowed archiving unique output based on previews. The current labelled control applies, preserves 2/2 critical facts and recovers 1/1 archived output exactly. These are synthetic contract checks, not live accuracy or savings evidence.
 
 Routing and compaction remain OFF by default. All provider behavior above uses synthetic data and mocks. Nothing was installed/switched in a production profile and no paid provider call was made. See [REVIEW_FIXES.md](REVIEW_FIXES.md) for the remaining adoption and host transaction/recall limits.
+
+## Relevance compaction release
+
+The current release has 272 Python unit/package tests, 11 Desktop behavior tests, 5 native loader/API/migration tests and 11 native compaction tests. It adds complete-content coverage, uncertain-part retention, chunk-boundary redaction, complete user constraints, partial assessment-budget handling and realistic research/file/media/publishing fixtures with critical middle facts. All native checks use the same reference/runtime recorded above. Old sections describe historical runs and do not define the current compaction policy.
+
+The current offline labelled replay uses a unique obsolete INFO log, not a retained duplicate. Estimated context is 34,922 → 6,031 tokens (82.7% reduction), with 2/2 critical facts retained and 1/1 exact paginated recovery. It uses two mocked assessment requests. Offline local duration is not Jev latency; provider costs/tokens remain unknown.
+
+```sh
+PYTHONPATH=agent python3 -m unittest discover -s tests -q
+node --experimental-vm-modules --test tests/desktop.test.cjs
+python3 scripts/benchmark_compaction.py
+python3 scripts/verify_native_compaction.py --hermes-source <HERMES_SOURCE>
+```
+
+For an explicitly chosen synthetic live provider trial on a securely configured backend, use `python3 scripts/benchmark_compaction.py --live`. No private client transcript is needed. Optional `--normal-hermes --baseline-model <MODEL>` adds a paid baseline summarizer call without changing profile settings. Compare recall, recovery, reported costs and duration; do not equate offline labelled tests with actual model accuracy. No provider credential was available in the development process for this pass, so no live provider result is claimed.

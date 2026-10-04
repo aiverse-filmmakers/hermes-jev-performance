@@ -14,7 +14,7 @@ class CompactionConfig:
     allow_external: bool = False
     drop_confidence: float = 0.90
     min_drop_chars: int = 1500
-    preview_chars: int = 600
+    chunk_chars: int = 12000
     preserve_recent_messages: int = 6
     max_state_tokens: int = 14000
     max_request_tokens: int = 30000
@@ -30,7 +30,7 @@ def read_compaction_config(ctx: Any) -> CompactionConfig:
     warnings = []
     bounds = {
         "drop_confidence": (0.5, 1.0), "min_drop_chars": (200, 1000000),
-        "preview_chars": (100, 4000), "preserve_recent_messages": (2, 1000),
+        "chunk_chars": (100, 48000), "preserve_recent_messages": (2, 1000),
         "max_state_tokens": (500, 26000), "max_request_tokens": (1000, 30000),
         "min_reduction_ratio": (0.05, 0.95), "max_batches": (1, 32),
         "deadline_seconds": (0.1, 30.0),

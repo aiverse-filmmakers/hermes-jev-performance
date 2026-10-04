@@ -202,30 +202,38 @@ class CompactionReviewTests(unittest.TestCase):
     def test_matching_head_tail_does_not_hide_unique_middle_fact(self):
         rows = transcript()
         old = rows[4]["content"]
-        rows[4]["content"] = old[:1000] + "CRITICAL_SHARD_COUNT=19" + old[1000:]
+        rows[4]["content"] = old[:25000] + "CRITICAL_SHARD_COUNT=19" + old[25000:]
         evaluator = Evaluator()
-        out = self.run_compact(rows, evaluator)
-        self.assertEqual(out.outcome, "no_candidates")
+        def relevance(**kwargs):
+            response = evaluator(**kwargs)
+            for name, question in kwargs["questions"].items():
+                if "CRITICAL_SHARD_COUNT=19" in question["instructions"]:
+                    response["answers"][name]["noul"] = 0.01
+            return response
+        out = self.run_compact(rows, relevance)
+        self.assertEqual(out.outcome, "keep_all")
         self.assertIs(out.messages, rows)
-        self.assertEqual(evaluator.calls, [])
+        self.assertTrue(any("CRITICAL_SHARD_COUNT=19" in q["instructions"]
+                            for call in evaluator.calls for q in call["questions"].values()))
+        self.assertFalse(self.archive.root.exists())
 
-    def test_all_selected_duplicates_have_complete_retained_copy(self):
-        rows = transcript(4)
-        out = self.run_compact(rows)
-        self.assertEqual(out.outcome, "applied")
-        for candidate in candidates_for(rows, self.config):
-            self.assertEqual(out.messages[candidate.retained_index]["content"], candidate.content)
-            self.assertFalse(out.messages[candidate.retained_index]["content"].startswith(STUB_PREFIX))
-        # Even outside the tail, the last exact copy cannot be archived.
-        rows += [{"role": "user", "content": "A later exchange"}] + [{"role": "assistant", "content": "tail"}] * 6
-        out = self.run_compact(rows)
-        self.assertEqual(out.outcome, "applied")
-        self.assertEqual(out.messages[14]["content"], rows[14]["content"])
-
-    def test_same_content_from_a_different_tool_is_not_evidence_of_redundancy(self):
+    def test_unique_output_can_be_archived_without_retained_duplicate(self):
         rows = transcript()
-        rows[7]["tool_calls"][0]["function"]["name"] = "web_extract"
-        self.assertEqual(candidates_for(rows, self.config), [])
+        rows[4]["content"] = "Completed unique log \n" * 2000
+        self.assertFalse(any(m.get("content") == rows[4]["content"] for m in rows[5:]))
+        out = self.run_compact(rows)
+        self.assertEqual(out.outcome, "applied")
+        ref = out.messages[4]["content"].split(STUB_PREFIX)[1].split(";")[0]
+        self.assertEqual(self.archive.recover(ref, limit=20000)["text"], rows[4]["content"][:20000])
+
+    def test_tool_identity_is_in_every_assessment(self):
+        rows = transcript()
+        rows[3]["tool_calls"][0]["function"]["name"] = "web_extract"
+        evaluator = Evaluator()
+        self.run_compact(rows, evaluator)
+        for call in evaluator.calls:
+            for q in call["questions"].values():
+                self.assertIn("Tool: web_extract", q["instructions"])
 
     def test_json_error_payloads_stay_verbatim_without_top_level_flag(self):
         for value in ({"error": "synthetic failure"}, {"ok": False}, {"success": False},
@@ -254,7 +262,10 @@ class CompactionReviewTests(unittest.TestCase):
                 raise RuntimeError("synthetic later-batch failure")
             return evaluator(**kwargs)
         rows = transcript(10)
-        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1500, preview_chars=100)
+        for i, row in enumerate(rows):
+            if row["role"] == "tool" and len(row["content"]) > 1500:
+                row["content"] = f"Old log {i} complete \n" * 150
+        config = replace(self.config, max_request_tokens=3000, max_state_tokens=1500, chunk_chars=2000)
         out = self.run_compact(rows, partial, config=config)
         self.assertIs(out.messages, rows)
         self.assertEqual(out.outcome, "fallback_error")

@@ -28,12 +28,7 @@ def fixture() -> tuple[list[dict], list[str], dict[str, bool]]:
                      "function": {"name": "read_file", "arguments": "{}"}}]})
         rows.append({"role": "tool", "tool_call_id": cid, "content": content})
         labels[f"archive_{len(rows)-1}"] = i == 0
-    # Make the old data outside the normal compressor's protected tail too.
-    # The obsolete INFO result has a complete newer copy. Unique evidence stays.
-    rows += [{"role": "user", "content": "The complete INFO output was repeated."},
-             {"role": "assistant", "content": "", "tool_calls": [{"id": "retained-info", "type": "function",
-              "function": {"name": "read_file", "arguments": "{}"}}]},
-             {"role": "tool", "tool_call_id": "retained-info", "content": outputs[0]}]
+    # Unique old outputs stay outside the complete protected recent exchange.
     for i in range(18):
         rows += [{"role": "user", "content": f"Continue the synthetic audit step {i}."},
                  {"role": "assistant", "content": "The unresolved trace and config remain needed."}]
@@ -45,7 +40,7 @@ def run_compaction_probe(*, live: bool = False, model: str = "typesafe/jev-1.13"
     rows, critical, labels = fixture()
     def labelled_response(**kwargs):
         return {"model": "synthetic-labelled", "usage": {}, "answers": {
-            name: {"type": "noul", "noul": 0.99 if labels[name] else 0.01} for name in kwargs["questions"]}}
+            name: {"type": "noul", "noul": 0.99 if labels[name.split("_part_")[0]] else 0.01} for name in kwargs["questions"]}}
     class SyntheticCredential:
         token = "synthetic-not-a-provider-key"
     engine = compactor or (JevCompactor() if live else JevCompactor(
@@ -89,6 +84,7 @@ def run_compaction_probe(*, live: bool = False, model: str = "typesafe/jev-1.13"
             "outcome": result.outcome, "duration_ms": (time.monotonic() - started) * 1000,
             "provider_cost_usd": result.cost_usd, "provider_input_tokens": result.input_tokens,
             "provider_output_tokens": result.output_tokens,
+            "assessment_requests": result.requests, "selected_outputs": result.selected,
             "exact_recovery_passed": recovery_ok, "exact_recovery_total": recovery_total})
     if normal_compress is not None:
         started = time.monotonic()
